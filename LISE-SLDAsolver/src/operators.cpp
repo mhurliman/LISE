@@ -6,31 +6,30 @@
 #include <assert.h>
 #include <mpi.h>
 
-#include "vars_nuclear.h"
+#include "common.h"
 
-void i2xyz(const int i, int* ix, int* iy, int* iz, const int ny, const int nz);
-
-void gradient_real(double* f, const int n, double* g_x, double* g_y, double* g_z, const int nstart, const int nstop, const MPI_Comm comm, double complex* d1_x, double complex* d1_y, double complex* d1_z, const int nx, const int ny, const int nz, const int ired)
+void gradient_real(
+    const double* f, 
+    int n, 
+    double* g_x, double* g_y, double* g_z, 
+    int nstart, int nstop, 
+    MPI_Comm comm, 
+    const complex* d1_x, const complex* d1_y, const complex* d1_z, 
+    int nx, int ny, int nz, 
+    int ired
+)
 {
     /*
     ired = 1: reduction
          = anything else : no reduction
     */
-    double* gr_x, * gr_y, * gr_z;
-    assert(gr_x = malloc(n * sizeof(double)));
-    assert(gr_y = malloc(n * sizeof(double)));
-    assert(gr_z = malloc(n * sizeof(double)));
-
     int nx1 = nx - 1;
     int ny1 = ny - 1;
     int nz1 = nz - 1;
 
-    for (int i = 0; i < n; i++)
-    {
-        gr_x[i] = 0;
-        gr_y[i] = 0;
-        gr_z[i] = 0;
-    }
+    double* gr_x = AllocateZeroed<double>(n);
+    double* gr_y = AllocateZeroed<double>(n);
+    double* gr_z = AllocateZeroed<double>(n);
 
     for (int i = nstart; i < nstop; i++)
     {
@@ -40,22 +39,25 @@ void gradient_real(double* f, const int n, double* g_x, double* g_y, double* g_z
         double sum = 0;
 #pragma omp parallel for default(shared) private(ix2) reduction(+:sum) 
         for (int ix2 = 0; ix2 < nx; ix2++)
-            sum += creal(d1_x[ix1 - ix2 + nx1] * f[iz1 + nz * (iy1 + ny * ix2)]);
-
+        {
+            sum += std::real(d1_x[ix1 - ix2 + nx1] * f[iz1 + nz * (iy1 + ny * ix2)]);
+        }
         gr_x[i] += sum;
 
         sum = 0;
 #pragma omp parallel for default(shared) private(iz2) reduction(+:sum) 
         for (int iz2 = 0; iz2 < nz; iz2++)
-            sum += creal(d1_z[iz1 - iz2 + nz1] * f[iz2 + nz * (iy1 + ny * ix1)]);
-
+        {
+            sum += std::real(d1_z[iz1 - iz2 + nz1] * f[iz2 + nz * (iy1 + ny * ix1)]);
+        }
         gr_z[i] += sum;
 
         sum = 0;
 #pragma omp parallel for default(shared) private(iy2) reduction(+:sum) 
         for (int iy2 = 0; iy2 < ny; iy2++)
-            sum += creal(d1_y[iy1 - iy2 + ny1] * f[iz1 + nz * (iy2 + ny * ix1)]);
-
+        {
+            sum += std::real(d1_y[iy1 - iy2 + ny1] * f[iz1 + nz * (iy2 + ny * ix1)]);
+        }
         gr_y[i] += sum;
     }
 
@@ -67,21 +69,26 @@ void gradient_real(double* f, const int n, double* g_x, double* g_y, double* g_z
     }
     else 
     {
-#pragma omp parallel for default(shared) private(i)
-        for (int i = 0; i < n; i++)
-        {
-            g_x[i] = gr_x[i];
-            g_y[i] = gr_y[i];
-            g_z[i] = gr_z[i];
-        }
+        CopyMemory(g_x, n, gr_x);
+        CopyMemory(g_y, n, gr_y);
+        CopyMemory(g_z, n, gr_z);
     }
 
-    free(gr_x); 
-    free(gr_y); 
-    free(gr_z);
+    Free(gr_x); 
+    Free(gr_y); 
+    Free(gr_z);
 }
 
-void gradient_real_orig(double* f, const int n, double* g_x, double* g_y, double* g_z, const int nstart, const int nstop, const MPI_Comm comm, double complex* d1_x, double complex* d1_y, double complex* d1_z, const int nx, const int ny, const int nz, const int ired)
+void gradient_real_orig(
+    const double* f, 
+    int n, 
+    double* g_x, double* g_y, double* g_z, 
+    int nstart, int nstop, 
+    MPI_Comm comm, 
+    const complex* d1_x, const complex* d1_y, const complex* d1_z, 
+    int nx, int ny, int nz, 
+    int ired
+)
 {
     /*
     ired = 1: reduction
@@ -91,17 +98,9 @@ void gradient_real_orig(double* f, const int n, double* g_x, double* g_y, double
     int ny1 = ny - 1;
     int nz1 = nz - 1;
     
-    double* gr_x, * gr_y, * gr_z;
-    assert(gr_x = malloc(n * sizeof(double)));
-    assert(gr_y = malloc(n * sizeof(double)));
-    assert(gr_z = malloc(n * sizeof(double)));
-
-    for (int i = 0; i < n; i++)
-    {
-        gr_x[i] = 0;
-        gr_y[i] = 0;
-        gr_z[i] = 0;
-    }
+    double* gr_x = AllocateZeroed<double>(n);
+    double* gr_y = AllocateZeroed<double>(n);
+    double* gr_z = AllocateZeroed<double>(n);
 
     for (int i = nstart; i < nstop; i++)
     {
@@ -114,125 +113,131 @@ void gradient_real_orig(double* f, const int n, double* g_x, double* g_y, double
             i2xyz(j, &ix2, &iy2, &iz2, ny, nz);
 
             if (iy1 == iy2 && iz1 == iz2)
-                gr_x[i] += creal(d1_x[ix1 - ix2 + nx1] * f[j]);
+                gr_x[i] += std::real(d1_x[ix1 - ix2 + nx1] * f[j]);
 
             if (iy1 == iy2 && ix1 == ix2)
-                gr_z[i] += creal(d1_z[iz1 - iz2 + nz1] * f[j]);
+                gr_z[i] += std::real(d1_z[iz1 - iz2 + nz1] * f[j]);
 
             if (ix1 == ix2 && iz1 == iz2)
-                gr_y[i] += creal(d1_y[iy1 - iy2 + ny1] * f[j]);
+                gr_y[i] += std::real(d1_y[iy1 - iy2 + ny1] * f[j]);
         }
     }
 
-    if (ired == 1) /* all reduce */
+    if (ired == 1) 
     {
+        /* all reduce */
         MPI_Allreduce(gr_x, g_x, n, MPI_DOUBLE, MPI_SUM, comm);
         MPI_Allreduce(gr_y, g_y, n, MPI_DOUBLE, MPI_SUM, comm);
         MPI_Allreduce(gr_z, g_z, n, MPI_DOUBLE, MPI_SUM, comm);
     }
     else
     {
-        for (int i = 0; i < n; i++)
-        {
-            g_x[i] = gr_x[i];
-            g_y[i] = gr_y[i];
-            g_z[i] = gr_z[i];
-        }
+        CopyMemory(g_x, n, gr_x);
+        CopyMemory(g_y, n, gr_y);
+        CopyMemory(g_z, n, gr_z);
     }
 
-    free(gr_x); 
-    free(gr_y); 
-    free(gr_z);
+    Free(gr_x); 
+    Free(gr_y); 
+    Free(gr_z);
 }
 
-void gradient(double complex* f, const int n, double complex* g_x, double complex* g_y, double complex* g_z, const int nstart, const int nstop, const MPI_Comm comm, double complex* d1_x, double complex* d1_y, double complex* d1_z, const int nx, const int ny, const int nz, const int ired)
+void gradient(
+    const complex* f, 
+    int n, 
+    complex* g_x, complex* g_y, complex* g_z, 
+    int nstart, int nstop, 
+    MPI_Comm comm, 
+    const complex* d1_x, const complex* d1_y, const complex* d1_z, 
+    int nx, int ny, int nz, 
+    int ired
+)
 {
     int nx1 = nx - 1;
     int ny1 = ny - 1;
     int nz1 = nz - 1;
 
-#pragma omp parallel for default(shared) private(i)
-    for (int i = 0; i < n; i++)
-    {
-        g_x[i] = 0;
-        g_y[i] = 0;
-        g_z[i] = 0;
-    }
+    ZeroMemory(g_x, n);
+    ZeroMemory(g_y, n);
+    ZeroMemory(g_z, n);
 
+#pragma omp parallel for default(shared) private(i)
     for (int i = nstart; i < nstop; i++)
     {
         int ix1, iy1, iz1;
         i2xyz(i, &ix1, &iy1, &iz1, ny, nz);
 
-        double complex sum = 0;
+        complex sum = 0;
 #pragma omp parallel for default(shared) private(ix2) reduction(+:sum) 
         for (int ix2 = 0; ix2 < nx; ix2++)
+        {
             sum += d1_x[ix1 - ix2 + nx1] * f[iz1 + nz * (iy1 + ny * ix2)];
-
+        }
         g_x[i] += sum;
 
         sum = 0;
 #pragma omp parallel for default(shared) private(iz2) reduction(+:sum) 
         for (int iz2 = 0; iz2 < nz; iz2++)
+        {
             sum += d1_z[iz1 - iz2 + nz1] * f[iz2 + nz * (iy1 + ny * ix1)];
-
+        }
         g_z[i] += sum;
 
         sum = 0;
 #pragma omp parallel for default(shared) private(iy2) reduction(+:sum) 
         for (int iy2 = 0; iy2 < ny; iy2++)
+        {
             sum += d1_y[iy1 - iy2 + ny1] * f[iz1 + nz * (iy2 + ny * ix1)];
-
+        }
         g_y[i] += sum;
     }
 
     if (ired == 1)
     {
-        double complex* gx, * gy, * gz;
-        assert(gx = malloc(n * sizeof(double)));
-        assert(gy = malloc(n * sizeof(double)));
-        assert(gz = malloc(n * sizeof(double)));
-
-        for (int i = 0; i < n; i++)
-        {
-            gx[i] = g_x[i];
-            gy[i] = g_y[i];
-            gz[i] = g_z[i];
-        }
+        complex* gx = AllocateCopy<complex>(n, g_x);
+        complex* gy = AllocateCopy<complex>(n, g_y);
+        complex* gz = AllocateCopy<complex>(n, g_z);
         
         MPI_Allreduce(gx, g_x, n, MPI_DOUBLE, MPI_SUM, comm);
         MPI_Allreduce(gy, g_y, n, MPI_DOUBLE, MPI_SUM, comm);
         MPI_Allreduce(gz, g_z, n, MPI_DOUBLE, MPI_SUM, comm);
 
-        free(gx); 
-        free(gy); 
-        free(gz);
+        Free(gx); 
+        Free(gy); 
+        Free(gz);
     }
 }
 
-void gradient_ud(double complex* f, const int n, double complex* g_x, double complex* g_y, double complex* g_z, double complex* g_xd, double complex* g_yd, double complex* g_zd, const int nstart, const int nstop, const MPI_Comm comm, double complex* d1_x, double complex* d1_y, double complex* d1_z, const int nx, const int ny, const int nz)
+void gradient_ud(
+    const complex* f, 
+    int n, 
+    complex* g_x, complex* g_y, complex* g_z, 
+    complex* g_xd, complex* g_yd, complex* g_zd, 
+    int nstart, int nstop, 
+    MPI_Comm comm, 
+    const complex* d1_x, const complex* d1_y, const complex* d1_z, 
+    int nx, int ny, int nz
+)
 {
+    ZeroMemory(g_x, nstop - nstart);
+    ZeroMemory(g_y, nstop - nstart);
+    ZeroMemory(g_z, nstop - nstart);
+
+    ZeroMemory(g_xd, nstop - nstart);
+    ZeroMemory(g_yd, nstop - nstart);
+    ZeroMemory(g_zd, nstop - nstart);
+
     int nx1 = nx - 1;
     int ny1 = ny - 1;
     int nz1 = nz - 1;
-    
-    for (int i = 0; i < nstop - nstart; i++)
-    {
-        g_x[i] = 0;
-        g_y[i] = 0;
-        g_z[i] = 0;
-        g_xd[i] = 0;
-        g_yd[i] = 0;
-        g_zd[i] = 0;
-    }
 
     for (int i = 0; i < nstop - nstart; i++)
     {
         int ix1, iy1, iz1;
         i2xyz(i + nstart, &ix1, &iy1, &iz1, ny, nz);
 
-        double complex sum1 = 0;
-        double complex sum2 = 0;
+        complex sum1 = 0;
+        complex sum2 = 0;
 
 #pragma omp parallel for default(shared) private(ix2) reduction(+:sum1,sum2) 
         for (int ix2 = 0; ix2 < nx; ix2++)
@@ -272,18 +277,24 @@ void gradient_ud(double complex* f, const int n, double complex* g_x, double com
     }
 }
 
-void gradient_orig(double complex* f, const int n, double complex* g_x, double complex* g_y, double complex* g_z, const int nstart, const int nstop, const MPI_Comm comm, double complex* d1_x, double complex* d1_y, double complex* d1_z, const int nx, const int ny, const int nz, const int ired)
+void gradient_orig(
+    const complex* f, 
+    int n, 
+    complex* g_x, complex* g_y, complex* g_z, 
+    int nstart, int nstop, 
+    MPI_Comm comm, 
+    const complex* d1_x, const complex* d1_y, const complex* d1_z, 
+    int nx, int ny, int nz, 
+    int ired
+)
 {
+    ZeroMemory(g_x, n);
+    ZeroMemory(g_y, n);
+    ZeroMemory(g_z, n);
+
     int nx1 = nx - 1;
     int ny1 = ny - 1;
     int nz1 = nz - 1;
-
-    for (int i = 0; i < n; i++)
-    {
-        g_x[i] = 0;
-        g_y[i] = 0;
-        g_z[i] = 0;
-    }
 
     for (int i = nstart; i < nstop; i++)
     {
@@ -308,32 +319,24 @@ void gradient_orig(double complex* f, const int n, double complex* g_x, double c
 
     if (ired == 1)
     {
-        double complex* gx, * gy, * gz;
-        assert(gx = malloc(n * sizeof(double)));
-        assert(gy = malloc(n * sizeof(double)));
-        assert(gz = malloc(n * sizeof(double)));
-
-        for (int i = 0; i < n; i++)
-        {
-            gx[i] = g_x[i];
-            gy[i] = g_y[i];
-            gz[i] = g_z[i];
-        }
+        complex* gx = AllocateCopy<complex>(n, g_x);
+        complex* gy = AllocateCopy<complex>(n, g_y);
+        complex* gz = AllocateCopy<complex>(n, g_z);
 
         MPI_Allreduce(gx, g_x, n, MPI_DOUBLE, MPI_SUM, comm);
         MPI_Allreduce(gy, g_y, n, MPI_DOUBLE, MPI_SUM, comm);
         MPI_Allreduce(gz, g_z, n, MPI_DOUBLE, MPI_SUM, comm);
 
-        free(gx); 
-        free(gy); 
-        free(gz);
+        Free(gx); 
+        Free(gy); 
+        Free(gz);
     }
 }
 
 void laplacean_complex(
-    const double complex* f, 
+    const complex* f, 
     int n, 
-    double complex* lapf, 
+    complex* lapf, 
     int nstart, int nstop, 
     MPI_Comm comm, 
     const double* k1d_x, const double* k1d_y, const double* k1d_z, 
@@ -341,10 +344,7 @@ void laplacean_complex(
     int ired
 )
 {
-    for (int i = 0; i < n; i++)
-    {
-        lapf[i] = 0;
-    }
+    ZeroMemory(lapf, n);
 
     for (int i = nstart; i < nstop; i++)
     {
@@ -363,14 +363,9 @@ void laplacean_complex(
 
     if (ired == 1)
     {
-        double complex* tmp;
-        assert(tmp = malloc(n * sizeof(double complex)));
-
-        for (int i = 0; i < n; i++)
-            tmp[i] = lapf[i];
-
+        complex* tmp = AllocateCopy<complex>(n, lapf);
         MPI_Allreduce(tmp, lapf, n, MPI_DOUBLE_COMPLEX, MPI_SUM, comm);
-        free(tmp);
+        Free(tmp);
     }
 }
 
@@ -386,7 +381,7 @@ void laplacean(
     int ired
 )
 {
-    memset(lapf, 0, n * sizeof(lapf[0]));
+    ZeroMemory(lapf, n);
 
     for (int i = nstart; i < nstop; i++)
     {
@@ -405,22 +400,20 @@ void laplacean(
 
     if (ired == 1)
     {
-        double* tmp;
-        assert(tmp = malloc(n * sizeof(double)));
-
-        memcpy(tmp, lapf, n * sizeof(tmp[0]));
+        double* tmp = AllocateCopy<double>(n, lapf);
 
         MPI_Allreduce(tmp, lapf, n, MPI_DOUBLE, MPI_SUM, comm);
-        free(tmp);
+        Free(tmp);
     }
 }
 
 void diverg(
     const double* fx, const double* fy, const double* fz, 
     double* divf, 
-    int n,  int nstart,  int nstop, 
+    int n,
+    int nstart,  int nstop, 
     MPI_Comm comm, 
-    const double complex* d1_x, const double complex* d1_y, const double complex* d1_z, 
+    const complex* d1_x, const complex* d1_y, const complex* d1_z, 
     int nx, int ny, int nz
 )
 {
@@ -428,9 +421,7 @@ void diverg(
     int ny1 = ny - 1;
     int nz1 = nz - 1;
 
-    double* divf_r;
-    assert(divf_r = malloc(n * sizeof(double)));
-    memset(divf_r, 0, n * sizeof(divf_r[0]));
+    double* divf_r = AllocateZeroed<double>(n);
 
     for (int i = 0; i < n; i++)
     {
@@ -443,18 +434,18 @@ void diverg(
             i2xyz(j, &ix2, &iy2, &iz2, ny, nz);
 
             if (iy1 == iy2 && iz1 == iz2)
-                divf_r[i] += creal(d1_x[ix1 - ix2 + nx1] * fx[j]);
+                divf_r[i] += std::real(d1_x[ix1 - ix2 + nx1] * fx[j]);
 
             if (iy1 == iy2 && ix1 == ix2)
-                divf_r[i] += creal(d1_z[iz1 - iz2 + nz1] * fz[j]);
+                divf_r[i] += std::real(d1_z[iz1 - iz2 + nz1] * fz[j]);
 
             if (ix1 == ix2 && iz1 == iz2)
-                divf_r[i] += creal(d1_y[iy1 - iy2 + ny1] * fy[j]);
+                divf_r[i] += std::real(d1_y[iy1 - iy2 + ny1] * fy[j]);
         }
     }
 
     MPI_Allreduce(divf_r, divf, n, MPI_DOUBLE, MPI_SUM, comm);
-    free(divf_r);
+    Free(divf_r);
 }
 
 void match_lattices(
@@ -465,14 +456,14 @@ void match_lattices(
     double Lc
 ) 
 {
-    double fpi = 4.0 * acos(-1.0) * 197.3269631 / 137.035999679;  /* 4 * pi * e2 */
+    double fpi = 4.0 * PI * 197.3269631 / 137.035999679;  /* 4 * pi * e2 */
 
     int nxyz = nx * ny * nz;
     int nxyz3 = fftrans->nxyz3;
 
-    assert(fftrans->i_l2s = malloc(nxyz3 * sizeof(int)));
-    assert(fftrans->fc = malloc(nxyz3 * sizeof(double)));
-    assert(fftrans->i_s2l = malloc(nxyz * sizeof(int)));
+    fftrans->i_l2s = Allocate<int>(nxyz3);
+    fftrans->fc = Allocate<double>(nxyz3);
+    fftrans->i_s2l = Allocate<int>(nxyz);
 
     for (int ix3 = 0; ix3 < nx; ix3++) 
     {
@@ -492,18 +483,18 @@ void match_lattices(
         }
     }
 
-    fftrans->fc[0] = fpi * .5 * Lc * Lc;
+    fftrans->fc[0] = fpi * 0.5 * Lc * Lc;
 
     for (int i = 1; i < nxyz3; i++)
     {
         fftrans->fc[i] = fpi * (1.0 - cos(sqrt(latt3->kin[i]) * Lc)) / latt3->kin[i];
     }
 
-    free(latt3->kx); latt3->kx = NULL;
-    free(latt3->ky); latt3->ky = NULL;
-    free(latt3->kz); latt3->kz = NULL;
-    free(latt3->xa); latt3->xa = NULL;
-    free(latt3->ya); latt3->ya = NULL;
-    free(latt3->za); latt3->za = NULL;
-    free(latt3->kin); latt3->kin = NULL;
+    Free(latt3->kx);
+    Free(latt3->ky);
+    Free(latt3->kz);
+    Free(latt3->xa);
+    Free(latt3->ya);
+    Free(latt3->za);
+    Free(latt3->kin);
 }

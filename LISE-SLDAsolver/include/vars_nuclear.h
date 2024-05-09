@@ -1,3 +1,4 @@
+#pragma once
 
 #include <complex.h>
 #include <fftw3.h>
@@ -8,10 +9,12 @@ Variable definitions
 //#define CONSTRCALC
 //#undef CONSTR_Q0
 
+#include "common.h"
+
 #define PI 3.1415926535897932 /* pi ~ 3.1415926535897932 38462643383279502884197 */
 #define MAX_REC_LEN 1024
 
-typedef struct
+struct Potentials
 {
     int nxyz;
     double* amu;
@@ -20,28 +23,28 @@ typedef struct
     double* wx;
     double* wy;
     double* wz;
-    double complex* delta;
-    double complex* delta_ext;
+    complex* delta;
+    complex* delta_ext;
     double* v_ext;
     double* v_constraint;
     double* lam, * lam2; // extra constraints, at the moment only q2is used, two other possible
     double amu2;
-} Potentials;
+};
 
-typedef struct
+struct Densities
 {
     int nstart;
     int nstop;
     double* rho;
     double* tau;
     double* divjj;
-    double complex* nu;
-    double complex* phases;  // e^(i\phi)
+    complex* nu;
+    complex* phases;  // e^(i\phi)
     double* jjx, * jjy, * jjz;
     double* jx, * jy, * jz;
-} Densities;
+};
 
-typedef struct
+struct Couplings
 {
     double c_rho_a0;
     double c_rho_b0;
@@ -86,9 +89,9 @@ typedef struct
     double rhoc; /// for surface pairing
     int iexcoul; // exchange couloumb
     int Skyrme; // 1 if skyrme EDF, 0 if SeaLL1
-} Couplings;
+};
 
-typedef struct
+struct Lattice_arrays
 {
     double* xa;
     double* ya;
@@ -99,28 +102,28 @@ typedef struct
     double* kin;
     double lx, ly, lz;
     int* wx, * wy, * wz;
-} Lattice_arrays;
+};
 
-typedef struct
+struct FFtransf_vars
 {
     int nxyz3;
-    double complex* buff, * buff3;
+    complex* buff, * buff3;
     fftw_plan plan_f, plan_b, plan_f3, plan_b3;
     int* i_s2l, * i_l2s;
     double* fc;
     double* filter;
-} FFtransf_vars;
+};
 
-typedef struct
+struct Axial_symmetry
 {
-    int* npts_xy;  // number of points need to be calculated in xy plane
-    int* npts_xyz; // number of points need to be calculated in 3d system; npxyz = npxy * nz
+    int npts_xy;  // number of points need to be calculated in xy plane
+    int npts_xyz; // number of points need to be calculated in 3d system; npxyz = npxy * nz
     int* ind_xyz; // indices of points in xyz need to be calculated, length: npxyz 
     int* car2cyl; // indices of points in rz for points in xyz, length: nxyz
 
-} Axial_symmetry;
+};
 
-typedef struct
+struct metadata_t
 {
     int nx;               // lattice number nx
     int ny;               // lattice number ny
@@ -159,5 +162,4 @@ typedef struct
     double ggp;  // coupling constant for protons
 
     double alpha_pairing; // pairing mixing parameter: 0 for volume, 0.5 for mixed, 1.0 for surface (default is volume).
-
-} metadata_t;
+};

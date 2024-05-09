@@ -8,21 +8,10 @@
 #include <complex.h>
 #include <fftw3.h>
 
-#include "vars_nuclear.h"
+#include "common.h"
+#include "operators.h"
 
-extern double pi;
-
-void gradient_real(double* , const int, double* , double* , double* , const int, const int, const MPI_Comm, double complex* , double complex* , double complex* , const int, const int, const int, const int);
-void laplacean(const double* , int, double*, int, int, MPI_Comm, const double* , const double* , const double* , int, int, int, int);
-void get_u_re(const MPI_Comm, Densities* , Densities* , Potentials* , Couplings* , const double, const int, const int, const int, const int, const int, double* , double* , double* , const int, const int, const int, Lattice_arrays *, FFtransf_vars *, const double, const double);
-void add_to_u_re(const MPI_Comm comm, Densities* dens_p, Densities* dens_n, double* ure, Couplings* cc_edf, const double hbar2m, const int nstart, const int nstop, const int nxyz, const int isospin, Lattice_arrays *latt_coords);
-void coul_pot(double* , double* , double* , double* , Lattice_arrays *, const int, const int, const int, const double, FFtransf_vars *, const double);
-void coul_pot3(double* , double* , double* , double* , Lattice_arrays *, const int, const int, const int, const double, FFtransf_vars *, const double);
-void filter_hm_c(double complex* , const int, FFtransf_vars *);
-void filter_hm_r(double* , const int, FFtransf_vars *);
-double center_dist(double* , const int, Lattice_arrays *, double* , double* , double* );
-
-int dens_func_params(const int iforce, const int ihfb, const int isospin, Couplings* cc_edf, const int ip, int icub, double alpha_pairing)
+int dens_func_params(int iforce, int ihfb, int isospin, Couplings* cc_edf, int ip, int icub, double alpha_pairing)
 {
     double a_n = -32.588;
     double b_n = -115.44;
@@ -32,7 +21,7 @@ int dens_func_params(const int iforce, const int ihfb, const int isospin, Coupli
     double mass_p = 938.272013;
     double mass_n = 939.565346;
     double hbarc = 197.3269631;
-    double hbar2m = pow(hbarc, 2.0) / (mass_p + mass_n);
+    double hbar2m = Square(hbarc) / (mass_p + mass_n);
 
     // default values
     double t0 = 0;
@@ -81,8 +70,8 @@ int dens_func_params(const int iforce, const int ihfb, const int isospin, Coupli
         t1 = 486.818;
         t2 = -546.395;
         t3 = 13777.000;
-        x0 = .834;
-        x1 = -.344;
+        x0 = 0.834;
+        x1 = -0.344;
         x2 = -1.000;
         x3 = 1.354;
         cc_edf->gamma = 1.0 / 6.0;
@@ -105,13 +94,13 @@ int dens_func_params(const int iforce, const int ihfb, const int isospin, Coupli
         t1 = 486.818;
         t2 = -546.395;
         t3 = 13777.000;
-        x0 = .834;
-        x1 = -.344;
+        x0 = 0.834;
+        x1 = -0.344;
         x2 = -1.000;
         x3 = 1.354;
         cc_edf->gamma = 1.0 / 6.0;
         w0 = 123.0;
-        cc_edf->gg = -370.;
+        cc_edf->gg = -370.0;
         cc_edf->gg_p = cc_edf->gg;
         cc_edf->gg_n = cc_edf->gg;
     }
@@ -124,13 +113,13 @@ int dens_func_params(const int iforce, const int ihfb, const int isospin, Coupli
         t1 = 486.818;
         t2 = -546.395;
         t3 = 13777.000;
-        x0 = .834;
-        x1 = -.344;
+        x0 = 0.834;
+        x1 = -0.344;
         x2 = -1.000;
         x3 = 1.354;
         cc_edf->gamma = 1.0 / 6.0;
         w0 = 123.0;
-        cc_edf->gg = -690.;
+        cc_edf->gg = -690.0;
         cc_edf->gg_p = cc_edf->gg;
         cc_edf->gg_n = cc_edf->gg;
     }
@@ -143,8 +132,8 @@ int dens_func_params(const int iforce, const int ihfb, const int isospin, Coupli
         t1 = 486.818;
         t2 = -546.395;
         t3 = 13777.000;
-        x0 = .834;
-        x1 = -.344;
+        x0 = 0.834;
+        x1 = -0.344;
         x2 = -1.000;
         x3 = 1.354;
         cc_edf->gamma = 1.0 / 6.0;
@@ -193,31 +182,15 @@ int dens_func_params(const int iforce, const int ihfb, const int isospin, Coupli
 
         if (iforce == 4)
         {
-            if (isospin == 1)
-            {
-                if (icub == 0)
-                    cc_edf->gg = -340.0625;
-                else if (icub == 1)
-                    cc_edf->gg = -292.5417;
-            }
-            else
-            {
-                if (icub == 0)
-                    cc_edf->gg = -265.2500;
-                else if (icub == 1)
-                    cc_edf->gg = -225.3672;
-            }
-        }
-
-        if (iforce == 4)
-        {
             if (icub == 0)
             {
+                cc_edf->gg = isospin == 1 ? -340.0625 : -265.2500;
                 cc_edf->gg_p = -292.5417;
                 cc_edf->gg_n = -225.3672;
             }
             else if (icub == 1)
             {
+                cc_edf->gg = isospin == 1 ? -292.5417 : -225.3672;
                 cc_edf->gg_p = -325.90;
                 cc_edf->gg_n = -240.99;
             }
@@ -260,12 +233,7 @@ int dens_func_params(const int iforce, const int ihfb, const int isospin, Coupli
         c2 = -461.650174489;
         eta_s = 81.3917529003;
         w0 = 73.5210618422;
-
-        if (icub == 0)
-            cc_edf->gg = -200.0; // original
-        else if (icub == 1)
-            cc_edf->gg = -230.0; // tuned to reproduce the same pairing gap with spherical cutoff.
-
+        cc_edf->gg = icub == 0 ? -200.0 /* original */ : -230.0 /* tuned to reproduce the same pairing gap with spherical cutoff. */;
         cc_edf->gg_p = cc_edf->gg;
         cc_edf->gg_n = cc_edf->gg;
         cc_edf->Skyrme = 0;
@@ -277,7 +245,9 @@ int dens_func_params(const int iforce, const int ihfb, const int isospin, Coupli
         fprintf(stdout, " Density functional name: %s \n", edf_name);
 
         if (icub == 1)
+        {
             printf("cubic-cutoff is used ");
+        }
 
         if (iforce != 7)
         {
@@ -317,8 +287,8 @@ int dens_func_params(const int iforce, const int ihfb, const int isospin, Coupli
 
     if (iforce != 7)
     {
-        cc_edf->c_laprho_0 = -(9.0 / 4.0 * t1 - t2 * (x2 + 1.25)) / 16.;
-        cc_edf->c_laprho_1 = -(-3.0 * t1 * (x1 + .5) - t2 * (x2 + .5)) / 32.;
+        cc_edf->c_laprho_0 = -(9.0 / 4.0 * t1 - t2 * (x2 + 1.25)) / 16.0;
+        cc_edf->c_laprho_1 = -(-3.0 * t1 * (x1 + 0.5) - t2 * (x2 + 0.5)) / 32.0;
         cc_edf->c_tau_0 = (3.0 / 16.0 * t1 + 0.25 * t2 * (x2 + 1.25));
         cc_edf->c_tau_1 = -(t1 * (x1 + .5) - t2 * (x2 + 0.5)) / 8.0;
         cc_edf->c_divjj_0 = -0.750 * w0;
@@ -327,9 +297,9 @@ int dens_func_params(const int iforce, const int ihfb, const int isospin, Coupli
     else
     {
         // (\rho \lap \rho) term
-        cc_edf->c_laprho_0 = -eta_s / 2.;
+        cc_edf->c_laprho_0 = -eta_s / 2.0;
         // no isovector contribution
-        cc_edf->c_laprho_1 = -eta_s / 2.; // - ( -3.0 * t1 * ( x1 + .5 ) - t2 *( x2 + .5 ) ) / 32. ;
+        cc_edf->c_laprho_1 = -eta_s / 2.0; // - ( -3.0 * t1 * ( x1 + .5 ) - t2 *( x2 + .5 ) ) / 32. ;
         // effective mass to be m* = m
         cc_edf->c_tau_0 = 0; // ( 3.0/16.0 * t1 + 0.25 * t2 * ( x2 + 1.25 ) ) ;
         // no isovector contribution
@@ -344,98 +314,87 @@ int dens_func_params(const int iforce, const int ihfb, const int isospin, Coupli
     cc_edf->c_divj_1 = cc_edf->c_divjj_1;
 
     /*   Proton and neutron coupling constants */
-    cc_edf->c_rho_p = cc_edf->c_rho_0 + isospin * cc_edf->c_rho_1;
-    cc_edf->c_rho_n = cc_edf->c_rho_0 - isospin * cc_edf->c_rho_1;
-    cc_edf->c_laprho_p = cc_edf->c_laprho_0 + isospin * cc_edf->c_laprho_1;
-    cc_edf->c_laprho_n = cc_edf->c_laprho_0 - isospin * cc_edf->c_laprho_1;
-    cc_edf->c_tau_p = cc_edf->c_tau_0 + isospin * cc_edf->c_tau_1;
-    cc_edf->c_tau_n = cc_edf->c_tau_0 - isospin * cc_edf->c_tau_1;
-    cc_edf->c_divjj_p = cc_edf->c_divjj_0 + isospin * cc_edf->c_divjj_1;
-    cc_edf->c_divjj_n = cc_edf->c_divjj_0 - isospin * cc_edf->c_divjj_1;
-    cc_edf->c_j_p = cc_edf->c_j_0 + isospin * cc_edf->c_j_1;
-    cc_edf->c_j_n = cc_edf->c_j_0 - isospin * cc_edf->c_j_1;
-    cc_edf->c_divj_p = cc_edf->c_divj_0 + isospin * cc_edf->c_divj_1;
-    cc_edf->c_divj_n = cc_edf->c_divj_0 - isospin * cc_edf->c_divj_1;
+    cc_edf->c_rho_p     = cc_edf->c_rho_0 + isospin * cc_edf->c_rho_1;
+    cc_edf->c_rho_n     = cc_edf->c_rho_0 - isospin * cc_edf->c_rho_1;
+    cc_edf->c_laprho_p  = cc_edf->c_laprho_0 + isospin * cc_edf->c_laprho_1;
+    cc_edf->c_laprho_n  = cc_edf->c_laprho_0 - isospin * cc_edf->c_laprho_1;
+    cc_edf->c_tau_p     = cc_edf->c_tau_0 + isospin * cc_edf->c_tau_1;
+    cc_edf->c_tau_n     = cc_edf->c_tau_0 - isospin * cc_edf->c_tau_1;
+    cc_edf->c_divjj_p   = cc_edf->c_divjj_0 + isospin * cc_edf->c_divjj_1;
+    cc_edf->c_divjj_n   = cc_edf->c_divjj_0 - isospin * cc_edf->c_divjj_1;
+    cc_edf->c_j_p       = cc_edf->c_j_0 + isospin * cc_edf->c_j_1;
+    cc_edf->c_j_n       = cc_edf->c_j_0 - isospin * cc_edf->c_j_1;
+    cc_edf->c_divj_p    = cc_edf->c_divj_0 + isospin * cc_edf->c_divj_1;
+    cc_edf->c_divj_n    = cc_edf->c_divj_0 - isospin * cc_edf->c_divj_1;
 
     if (ihfb == 0)
-        cc_edf->gg = 0.0;
+        cc_edf->gg = 0;
 
     return EXIT_SUCCESS;
 }
 
-void make_constraint(double* v, double* xa, double* ya, double* za, int nxyz, double y0, double z0, double asym, int* wx, int* wy, int* wz, double v0)
+void make_constraint(
+    double* v, 
+    const double* xa, const double* ya, const double* za, 
+    int nxyz, 
+    double y0, double z0, 
+    double asym, 
+    const int* wx, const int* wy, const int* wz, 
+    double v0)
 {
     for (int i = 0; i < nxyz; i++)
     {
-        v[i] = 2. * za[i] * za[i] - xa[i] * xa[i] - ya[i] * ya[i]; // shifted quadrupole
+        v[i] = (2.0 * za[i] * za[i]) - (xa[i] * xa[i]) - (ya[i] * ya[i]); // shifted quadrupole
         v[i + nxyz] = wx[i] * xa[i];
         v[i + 2 * nxyz] = wy[i] * ya[i];
         v[i + 3 * nxyz] = wz[i] * za[i];
     }
 }
 
-void allocate_pots(Potentials* pots, const double hbar2m, double* pot_array, const int ishift, const int n)
+void allocate_pots(Potentials* pots, double hbar2m, double* pot_array, int ishift, int n)
 {
     int nxyz = pots->nxyz;
 
-    assert(pots->u_re = malloc(nxyz * sizeof(double)));
-    assert(pots->mass_eff = malloc(nxyz * sizeof(double)));
-    assert(pots->wx = malloc(nxyz * sizeof(double)));
-    assert(pots->wy = malloc(nxyz * sizeof(double)));
-    assert(pots->wz = malloc(nxyz * sizeof(double)));
-    assert(pots->delta = malloc(nxyz * sizeof(double complex)));
-    assert(pots->delta_ext = malloc(nxyz * sizeof(double complex)));
-    assert(pots->v_ext = malloc(nxyz * sizeof(double)));
-
-#ifdef CONSTRCALC
-    assert(pots->v_constraint = malloc(4 * nxyz * sizeof(double)));
-    assert(pots->lam = malloc(4 * sizeof(double)));
-    assert(pots->lam2 = malloc(4 * sizeof(double)));
-#endif
-
-    for (int i = 0; i < n; i++)
-        pot_array[i] = 0;
-
     pots->u_re = pot_array + ishift;
-    pots->mass_eff = pot_array + ishift + 4 * nxyz;
     pots->wx = pot_array + ishift + nxyz;
     pots->wy = pot_array + ishift + 2 * nxyz;
     pots->wz = pot_array + ishift + 3 * nxyz;
-    pots->delta = (double complex* )(pot_array + ishift + 5 * nxyz);
+    pots->mass_eff = pot_array + ishift + 4 * nxyz;
+    pots->delta = reinterpret_cast<complex*>(pot_array + ishift + 5 * nxyz);
     pots->amu = pot_array + ishift + 7 * nxyz;
     pots->lam = pot_array + ishift + 7 * nxyz + 1;
 
-    for (int i = 0; i < nxyz; i++)
-    {
-        pots->mass_eff[i] = hbar2m;
-        pots->v_ext[i] = 0;
-        pots->delta_ext[i] = 0;
+    FillMemory(pots->mass_eff, nxyz, hbar2m);
+
+    pots->delta_ext = AllocateZeroed<complex>(nxyz);
+    pots->v_ext = AllocateZeroed<double>(nxyz);
+
 #ifdef CONSTRCALC
-        pots->v_constraint[i] = 0.;
-        pots->v_constraint[i + nxyz] = 0.;
-        pots->v_constraint[i + 2 * nxyz] = 0.;
-        pots->v_constraint[i + 3 * nxyz] = 0.;
+    pots->v_constraint = AllocateZeroed<double>(4 * nxyz);
+    pots->lam = Allocate<double>(4);
+    pots->lam2 = Allocate<double>(4);
 #endif
-    }
 }
 
 void update_potentials(
-    const int icoul, const int isospin, 
+    int icoul, int isospin, 
     Potentials* pots, Densities* dens_p, Densities* dens_n, Densities* dens, Couplings* cc_edf, 
-    const double e_cut, const int nstart, const int nstop, const MPI_Comm comm, 
-    const int nx, const int ny, const int nz, 
-    const double hbar2m, 
-    double complex* d1_x, double complex* d1_y, double complex* d1_z,
+    double e_cut, int nstart, int nstop, MPI_Comm comm, 
+    int nx, int ny, int nz, 
+    double hbar2m, 
+    complex* d1_x, complex* d1_y, complex* d1_z,
     double* k1d_x, double* k1d_y, double* k1d_z, 
-    Lattice_arrays *latt_coords, FFtransf_vars *fftransf_vars, const double nprot, 
-    const double dxyz, int icub
+    const Lattice_arrays* latt_coords, 
+    FFtransf_vars* fftransf_vars, 
+    double nprot, 
+    double dxyz, 
+    int icub
 )
 {
-    double pi2 = 4.0 * pow(pi, 2.0);
+    double pi2 = 4.0 * Square(PI);
     int nxyz = nx * ny * nz;
-    
-    double complex* delta;
-    assert(delta = malloc(nxyz * sizeof(double complex)));
+
+    complex* delta = Allocate<complex>(nxyz);
     
     for (int i = nstart; i < nstop; i++)
     {
@@ -454,7 +413,8 @@ void update_potentials(
 #endif
 
         double p0 = sqrt(fabs(ureal) / pots->mass_eff[i]);
-        double pc;
+        double pc = 0;
+
         if (e_cut > ureal)
         {
             pc = sqrt((e_cut - ureal) / pots->mass_eff[i]);
@@ -463,53 +423,63 @@ void update_potentials(
             else
                 pc = pc + p0 * atan(p0 / pc);
         }
-        else
-            pc = 0;
 
         double gg = cc_edf->gg * (1.0 - cc_edf->rhoc * (dens_p->rho[i] + dens_n->rho[i]));
-        delta[i] = -gg * dens->nu[i - nstart] / (1.0 - gg * pc / (pi2 * pots->mass_eff[i]));
 
         // coupling constant g independent of coordinates
         if (icub == 1)
         {
             double kk = 2.442749;
             double dx = latt_coords->za[1] - latt_coords->za[0];
+
             delta[i] = -gg * dens->nu[i - nstart] / (1.0 - gg * kk / pots->mass_eff[i] / 8.0 / (double)PI / dx);
+        }
+        else
+        {
+            delta[i] = -gg * dens->nu[i - nstart] / (1.0 - gg * pc / (pi2 * pots->mass_eff[i]));
         }
     }
 
     MPI_Allreduce(delta, pots->delta, nxyz, MPI_DOUBLE_COMPLEX, MPI_SUM, comm);
-    free(delta);
+    Free(delta);
 
-    double* wso;
-    assert(wso = malloc(nxyz * sizeof(double)));
-
-    for (int i = 0; i < nxyz; i++)
-        wso[i] = .5 * (cc_edf->c_divjj_p * dens_p->rho[i] + cc_edf->c_divjj_n * dens_n->rho[i]);
+    double* wso = AllocateInit<double>(nxyz, [&](int i)
+    {
+        return 0.5 * (cc_edf->c_divjj_p * dens_p->rho[i] + cc_edf->c_divjj_n * dens_n->rho[i]);
+    });
 
     gradient_real(wso, nxyz, pots->wx, pots->wy, pots->wz, nstart, nstop, comm, d1_x, d1_y, d1_z, nx, ny, nz, 1);
-    free(wso);
+    Free(wso);
 
     get_u_re(comm, dens_p, dens_n, pots, cc_edf, hbar2m, nstart, nstop, nxyz, icoul, isospin, k1d_x, k1d_y, k1d_z, nx, ny, nz, latt_coords, fftransf_vars, nprot, dxyz);
 }
 
-void get_u_re(const MPI_Comm comm, Densities* dens_p, Densities* dens_n, Potentials* pots, Couplings* cc_edf, const double hbar2m, const int nstart, const int nstop, const int nxyz, const int icoul, const int isospin, double* k1d_x, double* k1d_y, double* k1d_z, const int nx, const int ny, const int nz, Lattice_arrays *latt_coords, FFtransf_vars *fftransf_vars, const double nprot, const double dxyz)
+void get_u_re(
+    MPI_Comm comm, 
+    Densities* dens_p, Densities* dens_n, 
+    Potentials* pots, 
+    Couplings* cc_edf, 
+    double hbar2m, 
+    int nstart, int nstop, 
+    int nxyz, 
+    int icoul, 
+    int isospin, 
+    const double* k1d_x, const double* k1d_y, const double* k1d_z, 
+    int nx, int ny, int nz, 
+    const Lattice_arrays* latt_coords, 
+    FFtransf_vars* fftransf_vars, 
+    double nprot, 
+    double dxyz
+)
 {
     double xpow = 1.0 / 3.0;
     double e2 = -197.3269631 * pow(3.0 / acos(-1.0), xpow) / 137.035999679;
-    
-    double* work1, *work2, *work3;
-    assert(work1 = malloc(nxyz * sizeof(double)));
-    assert(work2 = malloc(nxyz * sizeof(double)));
-    assert(work3 = malloc(nxyz * sizeof(double)));
 
-    for (int i = 0; i < nxyz; i++)
-    {
-        work1[i] = cc_edf->c_laprho_p * dens_p->rho[i] + cc_edf->c_laprho_n * dens_n->rho[i];
-        work3[i] = 0;
+    double* work1 = AllocateInit<double>(nxyz, [&](int i) { return cc_edf->c_laprho_p * dens_p->rho[i] + cc_edf->c_laprho_n * dens_n->rho[i]; });
+    double* work2 = Allocate<double>(nxyz);
+    double* work3 = AllocateZeroed<double>(nxyz);
 
-        pots->mass_eff[i] = 0;
-    }
+    ZeroMemory(pots->mass_eff, nxyz);
 
     laplacean(work1, nxyz, work2, nstart, nstop, comm, k1d_x, k1d_y, k1d_z, nx, ny, nz, 0);
 
@@ -517,11 +487,12 @@ void get_u_re(const MPI_Comm comm, Densities* dens_p, Densities* dens_n, Potenti
     {
         double rho_0 = dens_n->rho[i] + dens_p->rho[i];
         double rho_1 = dens_p->rho[i] - dens_n->rho[i];
+
         pots->mass_eff[i] = hbar2m + cc_edf->c_tau_p * dens_p->rho[i] + cc_edf->c_tau_n * dens_n->rho[i];
-        
+
         double mass_eff_p = hbar2m + (cc_edf->c_tau_0 + cc_edf->c_tau_1) * dens_p->rho[i] + (cc_edf->c_tau_0 - cc_edf->c_tau_1) * dens_n->rho[i];
         double mass_eff_n = hbar2m + (cc_edf->c_tau_0 - cc_edf->c_tau_1) * dens_p->rho[i] + (cc_edf->c_tau_0 + cc_edf->c_tau_1) * dens_n->rho[i];
-        
+
         if (cc_edf->Skyrme)
         {
             work3[i] =
@@ -537,8 +508,8 @@ void get_u_re(const MPI_Comm comm, Densities* dens_p, Densities* dens_n, Potenti
                     // isoscalar part
                     2. * cc_edf->c_rho_b0 * rho_0 + 5. / 3. * cc_edf->c_rho_a0 * pow(rho_0, 2. / 3.) 
                     + 7. / 3. * cc_edf->c_rho_c0 * pow(rho_0, 4. / 3.) 
-                    - 1. / 3. * cc_edf->c_rho_a1 * pow(rho_1, 2.0) / (pow(rho_0, 4. / 3.) + 1e-14) 
-                    + 1. / 3. * cc_edf->c_rho_c1 * pow(rho_1, 2.0) / (pow(rho_0, 2. / 3.) + 1e-14) 
+                    - 1. / 3. * cc_edf->c_rho_a1 * Square(rho_1) / (pow(rho_0, 4. / 3.) + 1e-14) 
+                    + 1. / 3. * cc_edf->c_rho_c1 * Square(rho_1) / (pow(rho_0, 2. / 3.) + 1e-14) 
                     - 7. / 3. * cc_edf->c_rho_a2 * pow(rho_1, 4.0) / (pow(rho_0, 10. / 3.) + 1e-14) 
                     - 2.0 * cc_edf->c_rho_b2 * pow(rho_1, 4.0) / (pow(rho_0, 3.) + 1e-14) 
                     - 5. / 3. * cc_edf->c_rho_c2 * pow(rho_1, 4.0) / (pow(rho_0, 8. / 3.) + 1e-14)
@@ -547,14 +518,14 @@ void get_u_re(const MPI_Comm comm, Densities* dens_p, Densities* dens_n, Potenti
                         + 2 * cc_edf->c_rho_b1 * rho_1 
                         + 2 * cc_edf->c_rho_c1 * rho_1 * pow(rho_0, 1. / 3.) 
                         + 4 * cc_edf->c_rho_a2 * pow(rho_1, 3.0) / (pow(rho_0, 7. / 3.) + 1e-14) 
-                        + 4 * cc_edf->c_rho_b2 * pow(rho_1, 3.0) / (pow(rho_0, 2.0) + 1e-14) 
+                        + 4 * cc_edf->c_rho_b2 * pow(rho_1, 3.0) / (Square(rho_0) + 1e-14) 
                         + 4 * cc_edf->c_rho_c2 * pow(rho_1, 3.0) / (pow(rho_0, 5. / 3.) + 1e-14)
                     ));
         }
 
         work3[i] += (
             // laprho part
-            2. * work2[i] + cc_edf->c_tau_p * dens_p->tau[i - nstart] + cc_edf->c_tau_n * dens_n->tau[i - nstart]
+            2.0 * work2[i] + cc_edf->c_tau_p * dens_p->tau[i - nstart] + cc_edf->c_tau_n * dens_n->tau[i - nstart]
             // local spin-orbit term
             + cc_edf->c_divjj_p * dens_p->divjj[i - nstart] + cc_edf->c_divjj_n * dens_n->divjj[i - nstart]
             // external field
@@ -566,12 +537,13 @@ void get_u_re(const MPI_Comm comm, Densities* dens_p, Densities* dens_n, Potenti
     MPI_Allreduce(work3, pots->u_re, nxyz, MPI_DOUBLE, MPI_SUM, comm);
     MPI_Allreduce(pots->mass_eff, work3, nxyz, MPI_DOUBLE, MPI_SUM, comm);
 
-    for (int i = 0; i < nxyz; i++)
-        pots->mass_eff[i] = work3[i];
+    CopyMemory(pots->mass_eff, nxyz, work3);
 
     if (icoul == 1)
     {
-        coul_pot3(work3, dens_p->rho, work1, work2, latt_coords, 1, nxyz, nxyz, nprot, fftransf_vars, dxyz); /* Vcoul in work3 now */
+        /* Vcoul in work3 now */
+        coul_pot3(work3, dens_p->rho, 1, nxyz, nxyz, nprot, fftransf_vars, dxyz); 
+
         for (int i = 0; i < nxyz; i++)
         {
             pots->u_re[i] += work3[i];
@@ -579,12 +551,22 @@ void get_u_re(const MPI_Comm comm, Densities* dens_p, Densities* dens_n, Potenti
         }
     }
 
-    free(work1);
-    free(work2);
-    free(work3);
+    Free(work1);
+    Free(work2);
+    Free(work3);
 }
 
-void add_to_u_re(const MPI_Comm comm, Densities* dens_p, Densities* dens_n, double* ure, Couplings* cc_edf, const double hbar2m, const int nstart, const int nstop, const int nxyz, const int isospin, Lattice_arrays *latt_coords)
+void add_to_u_re(
+    MPI_Comm comm, 
+    const Densities* dens_p, const Densities* dens_n, 
+    double* ure,
+    Couplings* cc_edf, 
+    double hbar2m, 
+    int nstart, int nstop, 
+    int nxyz, 
+    int isospin, 
+    const Lattice_arrays* latt_coords
+)
 {
     double kk = 2.442749;
     double dx = latt_coords->za[1] - latt_coords->za[0];
@@ -609,26 +591,25 @@ void add_to_u_re(const MPI_Comm comm, Densities* dens_p, Densities* dens_n, doub
         double gg_n = gg0_n / (1.0 - gg0_n * kk / mass_eff_n / 8.0 / ((double)PI) / dx);
         double gg_p = gg0_p / (1.0 - gg0_p * kk / mass_eff_p / 8.0 / ((double)PI) / dx);
 
-        double gg_n_1 = (1.0 / (pow(gg0_n, 2.0) + 1e-14) * gg0_n_1 - mass_eff_n_1 / pow(mass_eff_n, 2.0) / 8.0 / ((double)PI) / dx * kk) * pow(gg_n, 2.0);
-        double gg_p_1 = (1.0 / (pow(gg0_p, 2.0) + 1e-14) * gg0_p_1 - mass_eff_p_1 / pow(mass_eff_p, 2.0) / 8.0 / ((double)PI) / dx * kk) * pow(gg_p, 2.0);
+        double gg_n_1 = (1.0 / (Square(gg0_n) + 1e-14) * gg0_n_1 - mass_eff_n_1 / Square(mass_eff_n) / 8.0 / ((double)PI) / dx * kk) * Square(gg_n);
+        double gg_p_1 = (1.0 / (Square(gg0_p) + 1e-14) * gg0_p_1 - mass_eff_p_1 / Square(mass_eff_p) / 8.0 / ((double)PI) / dx * kk) * Square(gg_p);
 
-        ure[i] += gg_n_1 * pow(cabs(dens_n->nu[i - nstart]), 2.0) + gg_p_1 * pow(cabs(dens_p->nu[i - nstart]), 2.0);
+        ure[i] += gg_n_1 * pow(std::abs(dens_n->nu[i - nstart]), 2.0) + gg_p_1 * pow(std::abs(dens_p->nu[i - nstart]), 2.0);
     }
 }
 
-void mix_potentials(double* pot_array, double* pot_array_old, const double alpha, const int ishift, const int n)
+void mix_potentials(double* pot_array, double* pot_array_old, double alpha, int ishift, int n)
 {
-    int i;
-    double beta;
-    beta = 1. - alpha;
-    for (i = ishift; i < n; i++)
+    double beta = 1.0 - alpha;
+
+    for (int i = ishift; i < n; i++)
     {
-        pot_array[i] = alpha * pot_array[i] + beta * pot_array_old[i];
+        pot_array[i] = (alpha * pot_array[i]) + (beta * pot_array_old[i]);
         pot_array_old[i] = pot_array[i];
     }
 }
 
-void mix_potentials1(double* pot_array, double* pot_array_old, const double alpha, const int ishift, const int n)
+void mix_potentials1(double* pot_array, double* pot_array_old, double alpha, int ishift, int n)
 {
     double beta = 1.0 - alpha;
 
@@ -638,7 +619,7 @@ void mix_potentials1(double* pot_array, double* pot_array_old, const double alph
     }
 }
 
-void coul_pot(double* vcoul, double* rho, double* work1, double* work2, Lattice_arrays *latt_coords, const int nstart, const int nstop, const int nxyz, const double npart, FFtransf_vars *fftransf_vars, const double dxyz)
+void coul_pot(double* vcoul, double* rho, double* work1, double* work2, Lattice_arrays *latt_coords, int nstart, int nstop, int nxyz, double npart, FFtransf_vars *fftransf_vars, double dxyz)
 {
     double e2 = 197.3269631 / 137.035999679;
 
@@ -670,13 +651,13 @@ void coul_pot(double* vcoul, double* rho, double* work1, double* work2, Lattice_
 
     double a_gauss = sqrt(a2);
     double z_sep = a_gauss * sqrt(1.5 * qzz / (2. - qzz));
-    double cnst = pow(a2 * pi, 1.5);
+    double cnst = pow(a2 * PI, 1.5);
 
     for (int i = 0; i < nxyz; i++)
     {
         work1[i] += pow(latt_coords->za[i] - z_ch - z_sep, 2.);
         work2[i] += pow(latt_coords->za[i] - z_ch + z_sep, 2.);
-        fftransf_vars->buff[i] = (double complex)(rho[i] / prot_number - .5 * (exp(-work1[i] / a2) + exp(-work2[i] / a2)) / cnst);
+        fftransf_vars->buff[i] = (complex)(rho[i] / prot_number - .5 * (exp(-work1[i] / a2) + exp(-work2[i] / a2)) / cnst);
     }
     fftw_execute(fftransf_vars->plan_f);
 
@@ -688,30 +669,28 @@ void coul_pot(double* vcoul, double* rho, double* work1, double* work2, Lattice_
     }
     fftw_execute(fftransf_vars->plan_b);
 
-    cnst = 4.0 * pi / (double)nxyz;
+    cnst = 4.0 * PI / (double)nxyz;
     prot_number = npart * e2;
 
     for (int i = nstart; i < nstop; i++)
     {
-        double rm = sqrt(work1[i]) + 1.e-16;
-        double rp = sqrt(work2[i]) + 1.e-16;
-        vcoul[i] = prot_number * (cnst * creal(fftransf_vars->buff[i]) + 0.5 * (erf(rp / a_gauss) / rp + erf(rm / a_gauss) / rm));
+        double rm = sqrt(work1[i]) + 1e-16;
+        double rp = sqrt(work2[i]) + 1e-16;
+
+        vcoul[i] = prot_number * (cnst * std::real(fftransf_vars->buff[i]) + 0.5 * (erf(rp / a_gauss) / rp + erf(rm / a_gauss) / rm));
     }
 }
 
-double center_dist(double* rho, const int n, Lattice_arrays *latt_coords, double* xc, double* yc, double* zc)
+double center_dist(const double* rho, int n, const Lattice_arrays* latt_coords, double* xc, double* yc, double* zc)
 {
     /* warning: the number of particles returned is missing a volume element dxyz */
-    *xc = 0;
-    *yc = 0;
-    *zc = 0;
-
-    double xp = 0, xm = 0, yp = 0, ym = 0, zp = 0, zm = 0;
     double part = 0;
+    double xp = 0, xm = 0, yp = 0, ym = 0, zp = 0, zm = 0;
 
     for (int i = 0; i < n; i++)
     {
         part += rho[i];
+
         if (latt_coords->xa[i] > 0)
             xp += rho[i] * latt_coords->xa[i] * latt_coords->wx[i];
         else
@@ -735,12 +714,12 @@ double center_dist(double* rho, const int n, Lattice_arrays *latt_coords, double
     return part;
 }
 
-double center_dist_pn(double* rho_p, double* rho_n, const int n, Lattice_arrays *latt_coords, double* xc, double* yc, double* zc)
+double center_dist_pn(const double* rho_p, const double* rho_n, int n, const Lattice_arrays* latt_coords, double* xc, double* yc, double* zc)
 {
     /* warning: the number of particles returned is missing a volume element dxyz */
     double part = 0;
-
     double xp = 0, xm = 0, yp = 0, ym = 0, zp = 0, zm = 0;
+
     for (int i = 0; i < n; i++)
     {
         double rho = rho_p[i] + rho_n[i];
@@ -769,10 +748,8 @@ double center_dist_pn(double* rho_p, double* rho_n, const int n, Lattice_arrays 
     return part;
 }
 
-void filter_hm_c(double complex* vec, const int n, FFtransf_vars *fftransf_vars)
+void filter_hm_c(complex* vec, const int n, FFtransf_vars *fftransf_vars)
 {
-    double xn = 1.0 / static_cast<double>(n);
-
     for (int i = 0; i < n; i++)
     {
         fftransf_vars->buff[i] = vec[i];
@@ -787,20 +764,18 @@ void filter_hm_c(double complex* vec, const int n, FFtransf_vars *fftransf_vars)
 
     for (int i = 0; i < n; i++)
     {
-        vec[i] = fftransf_vars->buff[i] * xn;
+        vec[i] = fftransf_vars->buff[i] / static_cast<double>(n);
     }
 }
 
-void filter_hm_r(double* vec, const int n, FFtransf_vars *fftransf_vars)
+void filter_hm_r(double* vec, int n, FFtransf_vars* fftransf_vars)
 {
-    double xn = 1.0 / n;
-
     for (int i = 0; i < n; i++)
     {
         fftransf_vars->buff[i] = vec[i];
     }
     fftw_execute(fftransf_vars->plan_f);
-    
+
     for (int i = 0; i < n; i++)
     {
         fftransf_vars->buff[i] *= fftransf_vars->filter[i];
@@ -809,11 +784,19 @@ void filter_hm_r(double* vec, const int n, FFtransf_vars *fftransf_vars)
 
     for (int i = 0; i < n; i++)
     {
-        vec[i] = creal(fftransf_vars->buff[i]) * xn;
+        vec[i] = std::real(fftransf_vars->buff[i]) / n;
     }
 }
 
-void coul_pot3(double* vcoul, double* rho, double* work1, double* work2, Lattice_arrays *latt_coords, const int nstart, const int nstop, const int nxyz, const double npart, FFtransf_vars *fftransf_vars, const double dxyz)
+void coul_pot3(
+    double* vcoul, 
+    const double* rho, 
+    int nstart, int nstop, 
+    int nxyz, 
+    double npart, 
+    FFtransf_vars* fftransf_vars, 
+    double dxyz
+)
 {
     /* newest version, calculates Coulomb using a bigger box */
     double xp = 0;
@@ -826,13 +809,11 @@ void coul_pot3(double* vcoul, double* rho, double* work1, double* work2, Lattice
     xp = npart / xp;
     xp = 1.0;
 
-    double xnxyz = 1.0 / ((double)fftransf_vars->nxyz3);
-
-    memset(fftransf_vars->buff3, 0, fftransf_vars->nxyz3 * sizeof(fftransf_vars->buff3[0]));
+    ZeroMemory(fftransf_vars->buff3, fftransf_vars->nxyz3);
 
     for (int i = 0; i < nxyz; i++)
     {
-        fftransf_vars->buff3[fftransf_vars->i_s2l[i]] = (rho[i] * xp + 0. * I);
+        fftransf_vars->buff3[fftransf_vars->i_s2l[i]] = rho[i] * xp;
     }
     fftw_execute(fftransf_vars->plan_f3);
 
@@ -842,7 +823,7 @@ void coul_pot3(double* vcoul, double* rho, double* work1, double* work2, Lattice
     }
     fftw_execute(fftransf_vars->plan_b3);
 
-    memset(vcoul, 0, nxyz * sizeof(vcoul[0]));
+    ZeroMemory(vcoul, nxyz);
 
     for (int i = 0; i < fftransf_vars->nxyz3; i++)
     {
@@ -851,6 +832,6 @@ void coul_pot3(double* vcoul, double* rho, double* work1, double* work2, Lattice
         if (ii < nstart || ii > nstop - 1)
             continue;
 
-        vcoul[ii] = creal(fftransf_vars->buff3[i]) * xnxyz;
+        vcoul[ii] = std::real(fftransf_vars->buff3[i]) / fftransf_vars->nxyz3;
     }
 }

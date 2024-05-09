@@ -3,9 +3,9 @@
 #include <stdio.h>
 #include <math.h>
 
-#include "vars_nuclear.h"
+#include "common.h"
 
-void dens_startTheta(const double A_mass, const double npart, const int nxyz, Densities* dens, Lattice_arrays* lattice_coords, const double dxyz, const double lx, const double ly, const double lz, const int ideform)
+void dens_startTheta(double A_mass, double npart, int nxyz, Densities* dens, const Lattice_arrays* lattice_coords, double dxyz, double lx, double ly, double lz, int ideform)
 {
     /* one option to start the code with a normal/anomalous spherical density */
     double a = 1.8;
@@ -60,10 +60,10 @@ void dens_startTheta(const double A_mass, const double npart, const int nxyz, De
 }
 
 
-void dens_gauss(const int A_mass, const int npart, const int nxyz, Densities* dens, Lattice_arrays* lattice_coords, const double dxyz, const double lx, const double ly, const double lz, const int ideform)
+void dens_gauss(int A_mass, int npart, int nxyz, Densities* dens, const Lattice_arrays* lattice_coords, double dxyz, double lx, double ly, double lz, int ideform)
 {
     /* one option to start the code with a normal/anomalous spherical density */
-    double r0 = lx / 5. /* 1. * pow( ( double ) A_mass , 1./3. ) */;
+    double r0 = lx / 5.0 /* 1. * pow( ( double ) A_mass , 1./3. ) */;
 
     double r01, r02;
     if (ideform == 2 || ideform == 3)

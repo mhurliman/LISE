@@ -44,57 +44,31 @@
 
 LINK= $(LISE_FFTW_LNK) $(LISE_LA_LNK) -lm $(LISE_MPI_LNK)
 
-EXE = xlise-static
+EXE := xlise-static
 
-OBJS = broyden_min.o print_wf.o deform.o \
-	get-blcs-dscr.o create_destroy_groups.o system_energy.o external_pot.o \
-	pots_io.o cnuclear-slda-solver_pn.o dens_io.o dens_start.o make_potentials.o \
-	get-mem-req-blk-cyc.o ham_matrix.o operators.o constr_dens.o axial_symmetry.o \
-	2dbc-slda-mpi-wr.o
+BUILD_DIR := ./builds
+SRC_DIRS := ./src
+
+SRCS := $(shell find $(SRC_DIRS) -name '*.cpp' -or -name '*.c' -or -name '*.s')
+OBJS := $(SRCS:%=$(BUILD_DIR)/%.o)
+DEPS := $(OBJS:.o=.d)
+
+INC_DIRS := $(shell find $(SRC_DIRS) -type d)
+INC_FLAGS := $(addprefix -I,$(INC_DIRS))
+
+CPPFLAGS := $(INC_FLAGS) -MMD -MP
 
 all: $(EXE)
+
 $(EXE): $(OBJS) 
 	$(CC) -o $(EXE) $(OBJS) $(LINK) 
 	cp $(EXE) $(LISE_BIN_DIR)
 
-2dbc-slda-mpi-wr.o: 2dbc-slda-mpi-wr.c
-	$(CC) -c $(LISE_MPI_INC) 2dbc-slda-mpi-wr.c
-get-blcs-dscr.o: get-blcs-dscr.c
-	$(CC) -c $(LISE_LA_INC) $(LISE_MPI_INC) get-blcs-dscr.c 
-get-mem-req-blk-cyc.o: get-mem-req-blk-cyc.c
-	$(CC) -c $(LISE_LA_INC) $(LISE_MPI_INC) get-mem-req-blk-cyc.c
-ham_matrix.o: ham_matrix.c vars_nuclear.h 
-	$(CC) -c $(LISE_LA_INC) $(LISE_MPI_INC) ham_matrix.c 
-pots_io.o: pots_io.c vars_nuclear.h
-	$(CC) -c $(LISE_LA_INC) $(LISE_MPI_INC) pots_io.c 
-constr_dens.o: constr_dens.c vars_nuclear.h 
-	$(CC) -c $(LISE_LA_INC) $(LISE_MPI_INC) constr_dens.c
-operators.o: operators.c vars_nuclear.h
-	$(CC) -c $(LISE_LA_INC) $(LISE_MPI_INC) operators.c 
-cnuclear-slda-solver_pn.o: cnuclear-slda-solver_pn.c vars_nuclear.h 
-	$(CC) -c $(LISE_LA_INC) $(LISE_MPI_INC) cnuclear-slda-solver_pn.c 
-external_pot.o: external_pot.c vars_nuclear.h 
-	$(CC) -c $(LISE_LA_INC) $(LISE_MPI_INC) external_pot.c 
-dens_start.o: dens_start.c vars_nuclear.h
-	$(CC) -c $(LISE_LA_INC) dens_start.c 
-make_potentials.o: make_potentials.c vars_nuclear.h 
-	$(CC) -c $(LISE_LA_INC) $(LISE_MPI_INC) make_potentials.c 
-dens_io.o: dens_io.c vars_nuclear.h
-	$(CC) -c $(LISE_LA_INC) $(LISE_MPI_INC) dens_io.c 
-system_energy.o: system_energy.c vars_nuclear.h
-	$(CC) -c $(LISE_LA_INC) $(LISE_MPI_INC) system_energy.c 
-deform.o: deform.c vars_nuclear.h
-	$(CC) -c $(LISE_LA_INC) deform.c 
-broyden_min.o: broyden_min.c
-	$(CC) -c $(LISE_LA_INC) -D$(LA) broyden_min.c 
-print_wf.o: print_wf.c vars_nuclear.h
-	$(CC) -c $(LISE_MPI_INC) print_wf.c 
-create_destroy_groups.o: create_destroy_groups.c
-	$(CC) -c $(LISE_MPI_INC) create_destroy_groups.c 
-axial_symmetry.o: axial_symmetry.c vars_nuclear.h
-	$(CC) -c $(LISE_LA_INC) $(LISE_MPI_INC) axial_symmetry.c 
+%.o : %.c
+	$(CC) -c $(CFLAGS) $(CPPFLAGS) $< -o $@
 
 .PHONY : clean
 clean:
 	rm -f $(OBJS) $(EXE) $(COBSJ)
 
+-include $(DEPS)

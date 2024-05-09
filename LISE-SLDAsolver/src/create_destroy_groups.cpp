@@ -8,15 +8,16 @@ for protons and neutrons, respectively
 #include <stdio.h>
 #include <assert.h>
 
-int create_mpi_groups(const MPI_Comm commw, MPI_Comm* gr_comm, const int np, int* gr_np, int* gr_ip, MPI_Group* group_comm)
+#include "common.h"
+
+int create_mpi_groups(MPI_Comm commw, MPI_Comm* gr_comm, int np, int* gr_np, int* gr_ip, MPI_Group* group_comm)
 {
     MPI_Group world_group;
     MPI_Comm_group(commw, &world_group);
 
     *gr_np = np / 2;
 
-    int* rankbuf;
-    assert(rankbuf = malloc(*gr_np * sizeof(int)));
+    int* rankbuf = Allocate<int>(*gr_np);
 
     for (int i = 0; i < *gr_np; i++)
     {
@@ -58,7 +59,7 @@ int create_mpi_groups(const MPI_Comm commw, MPI_Comm* gr_comm, const int np, int
         *gr_ip = ip_p;
         
         if (ip_p != rank)
-            printf(" the process will fail, the proton process does not have the expected group ip: %d != %d\n", i, *gr_ip);
+            printf(" the process will fail, the proton process does not have the expected group ip: %d != %d\n", rank, *gr_ip);
 
         *group_comm = group_p;
     }
@@ -70,12 +71,12 @@ int create_mpi_groups(const MPI_Comm commw, MPI_Comm* gr_comm, const int np, int
         *gr_ip = ip_n;
 
         if (ip_n + *gr_np != rank)
-            printf(" the process will fail, the proton process does not have the expected group ip: %d != %d\n", i, *gr_ip + *gr_np);
+            printf(" the process will fail, the proton process does not have the expected group ip: %d != %d\n", rank, *gr_ip + *gr_np);
 
         *group_comm = group_n;
     }
 
-    free(rankbuf);
+    Free(rankbuf);
 
     return isospin;
 }
@@ -83,6 +84,7 @@ int create_mpi_groups(const MPI_Comm commw, MPI_Comm* gr_comm, const int np, int
 void destroy_mpi_groups(MPI_Group* group_comm, MPI_Comm* gr_comm)
 {
     MPI_Barrier(*gr_comm);
+
     MPI_Group_free(group_comm);
     MPI_Comm_free(gr_comm);
 }

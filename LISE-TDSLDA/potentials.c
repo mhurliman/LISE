@@ -14,19 +14,19 @@ void diverg_real(double* f, double* fx, double* fy, double* fz, FFtransf_vars* f
 
 void allocate_phys_mem_pots(Potentials* pots, const int nxyz)
 {
-    assert(pots->u_re = malloc(nxyz * sizeof(double)));
-    assert(pots->mass_eff = malloc(nxyz * sizeof(double)));
-    assert(pots->wx = malloc(nxyz * sizeof(double)));
-    assert(pots->wy = malloc(nxyz * sizeof(double)));
-    assert(pots->wz = malloc(nxyz * sizeof(double)));
-    assert(pots->u1_x = malloc(nxyz * sizeof(double)));
-    assert(pots->u1_y = malloc(nxyz * sizeof(double)));
-    assert(pots->u1_z = malloc(nxyz * sizeof(double)));
-    assert(pots->ugrad_x = malloc(nxyz * sizeof(double)));
-    assert(pots->ugrad_y = malloc(nxyz * sizeof(double)));
-    assert(pots->ugrad_z = malloc(nxyz * sizeof(double)));
-    assert(pots->delta = malloc(nxyz * sizeof(double complex)));
-    assert(pots->v_ext = malloc(nxyz * sizeof(double)));
+    pots->u_re = malloc(nxyz * sizeof(double)));
+    pots->mass_eff = malloc(nxyz * sizeof(double)));
+    pots->wx = malloc(nxyz * sizeof(double)));
+    pots->wy = malloc(nxyz * sizeof(double)));
+    pots->wz = malloc(nxyz * sizeof(double)));
+    pots->u1_x = malloc(nxyz * sizeof(double)));
+    pots->u1_y = malloc(nxyz * sizeof(double)));
+    pots->u1_z = malloc(nxyz * sizeof(double)));
+    pots->ugrad_x = malloc(nxyz * sizeof(double)));
+    pots->ugrad_y = malloc(nxyz * sizeof(double)));
+    pots->ugrad_z = malloc(nxyz * sizeof(double)));
+    pots->delta = malloc(nxyz * sizeof(complex)));
+    pots->v_ext = malloc(nxyz * sizeof(double)));
 }
 
 void free_phys_mem_pots(Potentials* pots)

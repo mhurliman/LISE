@@ -2,7 +2,6 @@
 
 /* Main program */
 #include <stdlib.h>
-#include <getopt.h>
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
@@ -10,19 +9,16 @@
 #include <complex.h>
 #include <assert.h>
 
-#include "vars_nuclear.h"
+#include "common.h"
+#include "potentials.h"
+#include "operators.h"
 
 int parse_input_file(char* file_name);
 int readcmd(int argc, char* argv[], int ip);
-double center_dist(double* rho, const int n, Lattice_arrays* latt_coords, double* xc, double* yc, double* zc);
-double center_dist_pn(double* rho_p, double* rho_n, const int n, Lattice_arrays* latt_coords, double* xc, double* yc, double* zc);
 void print_help(const int ip, char** argv);
-void make_constraint(double* v, double* xa, double* ya, double* za, int nxyz, double y0, double z0, double asym, int* wx, int* wy, int* wz, double v0);
-void make_ham(double complex*, const double*, const double*, const double*, const double complex*, const double complex*, const double complex*, const Potentials*, const Densities*, int, int, int, int, int, int, int, int, int, int, int, int, int, MPI_Comm);
-void get_blcs_dscr(MPI_Comm, int, int, int, int, int, int, int*, int*, int*, int*, int*);
 
 //Summit, use IBM's build of Netlib ScaLAPACK
-void pzheevd(char*, char*, int*, double complex*, int*, int*, int*, double*, double complex*, int*, int*, int*, double complex*, int*, double*, int*, int*, int*, int*);
+void pzheevd(char*, char*, int*, complex*, int*, int*, int*, double*, complex*, int*, int*, int*, complex*, int*, double*, int*, int*, int*, int*);
 
 //Intel MKL
 //#include <mkl.h>
@@ -31,56 +27,7 @@ void pzheevd(char*, char*, int*, double complex*, int*, int*, int*, double*, dou
 //#include <mkl_pblas.h>
 //void  pzheevd(const char* jobz, const char* uplo, const MKL_INT* n, const MKL_Complex16* a, const MKL_INT* ia, const MKL_INT* ja, const MKL_INT* desca, double* w, MKL_Complex16* z, const MKL_INT* iz, const MKL_INT* jz, const MKL_INT* descz, MKL_Complex16* work, const MKL_INT* lwork, double* rwork, const MKL_INT* lrwork, MKL_INT* iwork, const MKL_INT* liwork, MKL_INT* info);
 
-int dens_func_params(const int, const int, const int, Couplings*, const int, int icub, double alpha_pairing);
-void generate_ke_1d(double*, const int, const double, const int);
-void generate_der_1d(double complex*, const int, const double, const int);
-void external_pot(const int, const int, const int, const double, double*, double complex*, const double, Lattice_arrays*, const double, const double, const double, const double, const double);
-void allocate_pots(Potentials*, const double, double*, const int, const int);
-void allocate_dens(Densities*, int, int, int);
-void make_coordinates(const int, const int, const int, const int, const double, const double, const double, Lattice_arrays*);
-void  match_lattices(Lattice_arrays* latt3, int nx, int ny, int nz, int nx3, int ny3, int nz3, FFtransf_vars* fftrans, double Lc);
-void external_so_m(double*, double*, double*, double*, double*, const double, Lattice_arrays*, const MPI_Comm, double complex*, double complex*, double complex*, const int, const int, const int);
-void occ_numbers(const double complex*, double*, int, int, int, int, int, int, int, int, int,  MPI_Comm, int);
-void compute_densities(double* lam, double complex* z, const int nxyz, const int ip, const MPI_Comm comm, Densities* dens, const int m_ip, const int n_iq, const int i_p, const int i_q, const int mb, const int nb, const int p_proc, const int q_proc, const int nx, const int ny, const int nz, double complex* d1_x, double complex* d1_y, double complex* d1_z, double* k1d_x, double* k1d_y, double* k1d_z, const double e_max, int* nwf, double* occ, FFtransf_vars* fftransf_vars, Lattice_arrays* latt_coords, int icub);
-void compute_densities_finitetemp(double* lam, double complex* z, const int nxyz, const int ip, const MPI_Comm comm, Densities* dens, const int m_ip, const int n_iq, const int i_p, const int i_q, const int mb, const int nb, const int p_proc, const int q_proc, const int nx, const int ny, const int nz, double complex* d1_x, double complex* d1_y, double complex* d1_z, const double e_max, const double temp, int* nwf, double* occ, FFtransf_vars* fftransf_vars, Lattice_arrays* latt_coords, int icub);
-void get_u_re(const MPI_Comm, Densities*, Densities*, Potentials*, Couplings*, const double, const int, const int, const int, const int, const int, double*, double*, double*, const int, const int, const int, Lattice_arrays*, FFtransf_vars*, const double, const double);
-void update_potentials(const int, const int, Potentials*, Densities*, Densities*, Densities*, Couplings*, const double, const int, const int, const MPI_Comm, const int, const int, const int, const double, double complex*, double complex*, double complex*, double*, double*, double*, Lattice_arrays*, FFtransf_vars*, const double, const double, int);
-void mix_potentials(double*, double*, const double, const int, const int);
-void dens_gauss(const int, const int, const int, Densities*, Lattice_arrays*, const double, const double, const double, const double, const int);
-void dens_startTheta(const double A_mass, const double npart, const int nxyz, Densities* dens, Lattice_arrays* lattice_coords, const double dxyz, const double lx, const double ly, const double lz, const int ideform);
-int minim_int(const int, const int);
-int write_dens(char*, Densities*, const MPI_Comm, const int, const int, const int, const int, double*, const double, const double, const double);
-int write_dens_td(char* fn, Densities* dens, const MPI_Comm comm, const int iam, const int nx, const int ny, const int nz);
-int write_qpe(char* fn, double* lam, const MPI_Comm comm, const int iam, const int nwf);
-int read_constr(char* fn, int nxyz, double* cc_lambda, const int iam, MPI_Comm comm);
-int read_dens(char*, Densities*, const MPI_Comm, const int, const int, const int, const int, double*, const double, const double, const double, char* filename);
-int read_pots(char*, double*, const int, const int, const int, const double, const double, const double, const int);
-int write_pots(char*, double*, const int, const int, const int, const double, const double, const double, const int);
-int write_dens_txt(FILE* fd, Densities* dens, const MPI_Comm comm, const int iam, const int nx, const int ny, const int nz, double* amu);
-void system_energy(Couplings* cc_edf, const int icoul, Densities* dens, Densities* dens_p, Densities* dens_n, const int isospin, double complex* delta, const int nstart, const int nstop, const int ip, const int gr_ip, const MPI_Comm comm, const MPI_Comm gr_comm, double* k1d_x, double* k1d_y, double* k1d_z, const int nx, const int ny, const int nz, const double hbar2m, const double dxyz, Lattice_arrays* latt_coords, FFtransf_vars* fftransf_vars, const double nprot, const double nneut, FILE* out);
-void mem_share(Densities*, double*, const int, const int);
-double rescale_dens(Densities*, const int, const double, const double, const int);
-int create_mpi_groups(const MPI_Comm, MPI_Comm*, const int, int*, int*, MPI_Group*);
-void destroy_mpi_groups(MPI_Group*, MPI_Comm*);
-void exch_nucl_dens(const MPI_Comm, const int, const int, const int, const int, double*, double*);
-int broyden_min(double*, double*, double*, double*, double*, double*, double*, const int, int*, const double);
-int broydenMod_min(double*, double*, double*, double*, double*, double*, double*, const int, int*, const double);
-extern void broyden_minf_(int*, double*, double*, double*, double*, int*, int*);
-int print_wf(char*, MPI_Comm, double*, double complex*, const int, const int, const int, const int, const int, const int, const int, const int, const int, const int, const int, const int, const int, const double, double*, int icub);
-void bc_wr_mpi(char* fn, MPI_Comm com, int p, int q, int ip, int iq, int blk, int jstrt, int jstp, int jstrd, int nxyz, double complex* z);
-int print_wf2(char*, MPI_Comm, double*, double complex*, const int, const int, const int, const int, const int, const int, const int, const int, const int, const int, const int, const int, const int, const double, double*, int icub);
-void array_rescale(double*, const int, const double);
-void change_mu_eq_sp(double*, double*, double*, const int, const int);
-double factor_ec(const double, const double);
-void deform(double*, double*, int, Lattice_arrays*, double, FILE*);
-void cm_initial(double* lam, double complex* z, const int m_ip, const int n_iq, const int i_p, const int i_q, const int mb, const int nb, const int p_proc, const int q_proc, const int nx, const int ny, const int nz, const double e_max, Lattice_arrays* latt_coords, double* xcm, double* ycm, double* zcm, const MPI_Comm comm, int icub);
-double distMass(double* rho_p, double* rho_n, double n, double z0, double* za, int*, double dxyz);
-double pi;
-double q2av(double* rho_p, double* rho_n, double* qzz, const int nxyz, const double, const double);
-double cm_coord(double* rho_p, double* rho_n, double* qzz, const int nxyz, const double np, const double nn);
-void axial_symmetry_densities(Densities*, Axial_symmetry*, int, Lattice_arrays*, FFtransf_vars*, const MPI_Comm, const int);
-int get_pts_tbc(int, int, int, double, double, Axial_symmetry*);
-void make_filter(double* filter, Lattice_arrays* latt_coords, int nxyz);
+
 
 metadata_t md =
 {
@@ -167,17 +114,16 @@ int main(int argc, char** argv)
     double* npart;
     int i, ii, j, na, info, Ione = 1, itb;
     
-    int* iwork;
-    double complex s1;
-    double complex* work, tw[2];
+    complex s1;
+    complex* work, tw[2];
     double* rwork, tw_[2];
 
-    //double complex * rwork , tw_[2] ;
+    //complex * rwork , tw_[2] ;
     double* amu, const_amu = 4.e-2, c_q2 = 1.e-5;
     double mass_p = 938.272013;
     double mass_n = 939.565346;
     double hbarc = 197.3269631;
-    double hbar2m = pow(hbarc, 2.0) / (mass_p + mass_n);
+    double hbar2m = Square(hbarc) / (mass_p + mass_n);
     double hbo = 2.0, alpha_mix = 0.25, rone = 1.0;
     double err;
 
@@ -249,8 +195,8 @@ int main(int argc, char** argv)
     if (md.coulomb == 0) 
         icoul = 0; // no coulomb potential
 
-    int nprot = md.nprot;
-    int nneut = md.nneut;
+    double nprot = md.nprot;
+    double nneut = md.nneut;
     int niter = md.niter;
 
     icm = md.icm;
@@ -261,7 +207,7 @@ int main(int argc, char** argv)
 
     if (imass == 1) 
     {
-        hbar2m = .5 * pow(hbarc, 2.0);
+        hbar2m = 0.5 * Square(hbarc);
 
         if (isospin == 1)
             hbar2m /= mass_p;
@@ -278,14 +224,18 @@ int main(int argc, char** argv)
     alpha_mix = md.alpha_mix;
     e_cut = md.ecut;   // energy cutoff
 
-    double e_cut_spherical = hbar2m * PI * PI / dx / dx;
     if (icub == 0)
-        e_cut = e_cut_spherical;
+    {
+        // Spherical cut-off
+        e_cut = hbar2m * PI * PI / dx / dx;
+    }
 
     irun = md.irun;   // choice of start of density
 
     if (md.resc_dens == 1) 
+    {
         irsc = 1;
+    }
 
     iprint_wf = md.iprint_wf;   // choice of printing wfs
 
@@ -343,8 +293,6 @@ int main(int argc, char** argv)
             fprintf(stdout, "%d x %d grid \n", p_proc, q_proc);
     }
 
-    pi = acos(-1.0);
-
     int nxyz = nx * ny * nz;
     int Lx = nx * dx;
     int Ly = ny * dy;
@@ -369,10 +317,8 @@ int main(int argc, char** argv)
         fprintf(stdout, " Z=%f N=%f\n\n", nprot, nneut);
     }
 
-    assert(ax.npts_xy = (int*)malloc(sizeof(int)));
-    assert(ax.npts_xyz = (int*)malloc(sizeof(int)));
-    assert(ax.ind_xyz = (int*)malloc(nxyz * sizeof(int)));
-    assert(ax.car2cyl = (int*)malloc(nxyz * sizeof(int)));
+    ax.ind_xyz = Allocate<int>(nxyz);
+    ax.car2cyl = Allocate<int>(nxyz);
 
     if (isymm == 1)
     {
@@ -387,7 +333,7 @@ int main(int argc, char** argv)
         {
             if (ip == 0)
             {
-                fprintf(stdout, "%d pts need to be calculated in xy-plane, %d totally in full space\n", *(ax.npts_xy), *(ax.npts_xyz));
+                fprintf(stdout, "%d pts need to be calculated in xy-plane, %d totally in full space\n", ax.npts_xy, ax.npts_xyz);
             }
 
         }
@@ -395,9 +341,9 @@ int main(int argc, char** argv)
     else
         // calculate full lattice 
     {
-        ax.npts_xy[0] = nx * ny;
+        ax.npts_xy = nx * ny;
 
-        ax.npts_xyz[0] = nxyz;
+        ax.npts_xyz = nxyz;
 
         for (int i = 0; i < nxyz; i++)
         {
@@ -406,7 +352,7 @@ int main(int argc, char** argv)
         }
         if (ip == 0)
         {
-            fprintf(stdout, "%d pts need to be calculated in xy-plane, %d totally in full space\n", *(ax.npts_xy), *(ax.npts_xyz));
+            fprintf(stdout, "%d pts need to be calculated in xy-plane, %d totally in full space\n", ax.npts_xy, ax.npts_xyz);
         }
 
     }
@@ -415,20 +361,24 @@ int main(int argc, char** argv)
     {
         m_broy = 7 * nxyz + 5;
         ishift = 0;
+
         if (ip == 0)
+        {
             fprintf(stdout, "Linear mixing will be performed \n");
+        }
     }
     else
     {
         m_broy = 2 * (7 * nxyz + 5);
+
         if (ip == 0)
         {
             fprintf(stdout, "Broyden mixing will be performed\n");
-            assert(f_old = malloc(m_broy * sizeof(double)));
-            assert(b_bra = malloc((niter - 1) * m_broy * sizeof(double)));
-            assert(b_ket = malloc((niter - 1) * m_broy * sizeof(double)));
-            assert(diag = malloc((niter - 1) * sizeof(double)));
-            assert(v_in_old = malloc(m_broy * sizeof(double)));
+            f_old = Allocate<double>(m_broy);
+            b_bra = Allocate<double>((niter - 1) * m_broy);
+            b_ket = Allocate<double>((niter - 1) * m_broy);
+            diag = Allocate<double>(niter - 1);
+            v_in_old = Allocate<double>(m_broy);
         }
 
         ishift = (7 * nxyz + 5) * (1 - isospin) / 2;
@@ -442,9 +392,8 @@ int main(int argc, char** argv)
     int root_p = 0;
     int root_n = gr_np;
     
-    double* pot_array, *pot_array_old;
-    assert(pot_array = malloc(m_broy * sizeof(double)));
-    assert(pot_array_old = malloc(m_broy * sizeof(double)));
+    double* pot_array = AllocateZeroed<double>(m_broy);
+    double* pot_array_old = AllocateZeroed<double>(m_broy);
 
     allocate_pots(&pots, hbar2m, pot_array, ishift, m_broy);
     allocate_pots(&pots_old, hbar2m, pot_array_old, ishift, m_broy);
@@ -459,7 +408,7 @@ int main(int argc, char** argv)
     allocate_dens(&dens_p, gr_ip, gr_np, nxyz);
     allocate_dens(&dens_n, gr_ip, gr_np, nxyz);
 
-    Densities* dens = isospin == 1 ? dens_p : dens_n;
+    Densities* dens = isospin == 1 ? &dens_p : &dens_n;
 
     if (dens->nstop - dens->nstart > 0)
     {
@@ -471,8 +420,8 @@ int main(int argc, char** argv)
     }
 
     double* ex_array_n, * ex_array_p;
-    assert(ex_array_p = malloc(idim * sizeof(double)));
-    assert(ex_array_n = malloc(idim * sizeof(double)));
+    double* ex_array_p = Allocate<double>(idim);
+    double* ex_array_n = Allocate<double>(idim);
 
     mem_share(&dens_p, ex_array_p, nxyz, idim);
     mem_share(&dens_n, ex_array_n, nxyz, idim);
@@ -518,6 +467,7 @@ int main(int argc, char** argv)
         dx_ = dz;
     }
 
+    // Build the x and k lattice arrays
     int nx3 = 3 * n3;
     int ny3 = 3 * n3;
     int nz3 = 3 * n3;
@@ -527,21 +477,22 @@ int main(int argc, char** argv)
     make_coordinates(nxyz, nx, ny, nz, dx, dy, dz, &lattice_coords);
     make_coordinates(nxyz3, nx3, ny3, nz3, dx, dy, dz, &lattice_coords3);
 
+    // Create the FFT plans and buffers
     FFtransf_vars fftransf_vars;
     fftransf_vars.nxyz3 = nxyz3;
 
-    double Lc = sqrt(pow(n3 * dx_, 2.) + pow(n3 * dx_, 2.0) + pow(n3 * dx_, 2.0));
+    double Lc = sqrt(Square(n3 * dx_) + Square(n3 * dx_) + Square(n3 * dx_));
     match_lattices(&lattice_coords3, nx, ny, nz, nx3, ny3, nz3, &fftransf_vars, Lc);
 
-    assert(fftransf_vars.buff = malloc(nxyz * sizeof(double complex)));
-    assert(fftransf_vars.buff3 = malloc(nxyz3 * sizeof(double complex)));
+    fftransf_vars.buff = Allocate<complex>(nxyz);
+    fftransf_vars.buff3 = Allocate<complex>(nxyz3);
 
-    fftransf_vars.plan_f = fftw_plan_dft_3d(nx, ny, nz, fftransf_vars.buff, fftransf_vars.buff, FFTW_FORWARD, FFTW_ESTIMATE);
-    fftransf_vars.plan_b = fftw_plan_dft_3d(nx, ny, nz, fftransf_vars.buff, fftransf_vars.buff, FFTW_BACKWARD, FFTW_ESTIMATE);
-    fftransf_vars.plan_f3 = fftw_plan_dft_3d(nx3, ny3, nz3, fftransf_vars.buff3, fftransf_vars.buff3, FFTW_FORWARD, FFTW_ESTIMATE);
-    fftransf_vars.plan_b3 = fftw_plan_dft_3d(nx3, ny3, nz3, fftransf_vars.buff3, fftransf_vars.buff3, FFTW_BACKWARD, FFTW_ESTIMATE);
+    fftransf_vars.plan_f = fftw_plan_dft_3d(nx, ny, nz, (fftw_complex*)fftransf_vars.buff, (fftw_complex*)fftransf_vars.buff, FFTW_FORWARD, FFTW_ESTIMATE);
+    fftransf_vars.plan_b = fftw_plan_dft_3d(nx, ny, nz, (fftw_complex*)fftransf_vars.buff, (fftw_complex*)fftransf_vars.buff, FFTW_BACKWARD, FFTW_ESTIMATE);
+    fftransf_vars.plan_f3 = fftw_plan_dft_3d(nx3, ny3, nz3, (fftw_complex*)fftransf_vars.buff3, (fftw_complex*)fftransf_vars.buff3, FFTW_FORWARD, FFTW_ESTIMATE);
+    fftransf_vars.plan_b3 = fftw_plan_dft_3d(nx3, ny3, nz3, (fftw_complex*)fftransf_vars.buff3, (fftw_complex*)fftransf_vars.buff3, FFTW_BACKWARD, FFTW_ESTIMATE);
 
-    assert(fftransf_vars.filter = malloc(nxyz * sizeof(double)));
+    fftransf_vars.filter = Allocate<double>(nxyz);
 
     for (int ix = 0; ix < nx; ix++)
     {
@@ -562,16 +513,16 @@ int main(int argc, char** argv)
     }
 
     /* constructing the phase factor in densities */
-    assert(dens->phases = (double complex*)malloc(nxyz * sizeof(double complex)));
+    assert(dens->phases = (complex*) malloc(nxyz * sizeof(complex)));
 
     for (int i = 0; i < nxyz; i++)
     {
         double xa = lattice_coords.xa[i];
         double ya = lattice_coords.ya[i];
 
-        double rr = sqrt(pow(xa, 2.0) + pow(ya, 2.0));
+        double rr = sqrt(Square(xa) + Square(ya));
 
-        if (rr < (double)1e-14)  // at center of vortex (vortex line) the pairing field should vanish
+        if (rr < 1e-14)  // at center of vortex (vortex line) the pairing field should vanish
         {
             dens->phases[i] = 0;
         }
@@ -579,23 +530,23 @@ int main(int argc, char** argv)
         {
             double phi = asin(ya / rr);
 
-            if (phi > (double)1e-14)
+            if (phi > 1e-14)
             {
                 if (xa < 0)
-                    phi = (double)PI - phi;
+                    phi = PI - phi;
             }
-            else if (phi < -(double)1e-14)
+            else if (phi < -1e-14)
             {
                 if (xa < 0)
-                    phi = -(double)PI - phi;
+                    phi = -PI - phi;
             }
             else
             {
                 if (xa < 0)
-                    phi = -(double)PI;
+                    phi = -PI;
             }
 
-            dens->phases[i] = cexp(I * phi);
+            dens->phases[i] = std::exp(phi * 1i);
         }
     }
     
@@ -618,18 +569,12 @@ int main(int argc, char** argv)
         {
             fprintf(stdout, "initial densities set\n");
 
-            double* rho_t;
-            rho_t = malloc(nxyz * sizeof(double));
-
-            for (int i = 0; i < nxyz; i++)
-            {
-                rho_t[i] = dens_p.rho[i] + dens_n.rho[i];
-            }
+            double* rho_t = AllocateInit<double>(nxyz, [&](int i) { return dens_p.rho[i] + dens_n.rho[i]; });
 
             center_dist(rho_t, nxyz, &lattice_coords, &xcm, &ycm, &zcm);
 
             fprintf(stdout, "Initial: xcm=%f ycm=%f zcm=%f\n", xcm, ycm, zcm);
-            free(rho_t);
+            Free(rho_t);
         }
         break;
 
@@ -723,21 +668,23 @@ int main(int argc, char** argv)
 
             constr[i] = za / 10;  // dipole
             constr[i + nxyz] = (2 * za * za - xa * xa - ya * ya) / 100.0;  // quadrupole
-            constr[i + 2 * nxyz] = za * (2 * za * za - 3 * xa * xa - 3 * ya * ya) * sqrt(7 / pi) / 4 / 1000.0; // oxatupole
-
+            constr[i + 2 * nxyz] = za * (2 * za * za - 3 * xa * xa - 3 * ya * ya) * sqrt(7 / PI) / 4 / 1000.0; // oxatupole
         }
 
-        for (int i = 0; i < nxyz; i++) 
-            pots.v_ext[i] = 0;
+        ZeroMemory(pots.v_ext, nxyz);
 
         for (int j = 0; j < 3; j++)
+        {
             for (int i = 0; i < nxyz; i++)
+            {
                 pots.v_ext[i] += -1.0 * (constr[i + j * nxyz] * cc_lambda[j]) * filter[i];
+            }
+        }
         
         // add a Wood-Saxon filter
 
-        free(constr); 
-        free(filter);
+        Free(constr); 
+        Free(filter);
     }
 
 #ifdef CONSTRCALC
@@ -775,36 +722,36 @@ int main(int argc, char** argv)
     }
 
     if (ip == 0)
+    {
         fprintf(stdout, " ** Pairing parameters ** \n proton strength = %f neutron strength = %f \n", cc_edf.gg_p, cc_edf.gg_n);
+    }
     
     /* need to set the grid here */
     int na = 4 * nxyz;
     get_blcs_dscr(gr_comm, na, na, mb, nb, p_proc, q_proc, &i_p, &i_q, descr_h, &m_ip, &n_iq);
 
-    double complex* z_eig, *ham; /* the Hamiltonian to be diagonalized, cyclicly decomposed */
-    assert(ham = malloc(m_ip * n_iq * sizeof(double complex)));
-    assert(z_eig = malloc(m_ip * n_iq * sizeof(double complex)));
+    complex* z_eig, *ham; /* the Hamiltonian to be diagonalized, cyclicly decomposed */
+    complex* ham = Allocate<complex>(m_ip * n_iq);
+    complex* z_eig = Allocate<complex>(m_ip * n_iq);
 
     double* lam, *lam_old;
-    assert(lam = malloc(na * sizeof(double)));
-    assert(lam_old = malloc(2 * nxyz * sizeof(double)));
+    double* lam = Allocate<double>(na);
+    double* lam_old = Allocate<double>(2 * nxyz);
 
     memset(lam_old, 0, 2 * nxyz * sizeof(lam_old[0]));
 
     /* allocate some extra arrays to store the 1D KE and Derivatives */
-    double* k1d_x, * k1d_y, * k1d_z;
-    assert(k1d_x = malloc(nx * sizeof(double)));
-    assert(k1d_y = malloc(ny * sizeof(double)));
-    assert(k1d_z = malloc(nz * sizeof(double)));
+    double* k1d_x = Allocate<double>(nx);
+    double* k1d_y = Allocate<double>(ny);
+    double* k1d_z = Allocate<double>(nz);
 
     generate_ke_1d(k1d_x, nx, dx, ider);
     generate_ke_1d(k1d_y, ny, dy, ider);
     generate_ke_1d(k1d_z, nz, dz, ider);
 
-    double complex* d1_x, * d1_y, * d1_z;
-    assert(d1_x = malloc((2 * nx - 1) * sizeof(double complex)));
-    assert(d1_y = malloc((2 * ny - 1) * sizeof(double complex)));
-    assert(d1_z = malloc((2 * nz - 1) * sizeof(double complex)));
+    complex* d1_x = Allocate<complex>(2 * nx - 1);
+    complex* d1_y = Allocate<complex>(2 * ny - 1);
+    complex* d1_z = Allocate<complex>(2 * nz - 1);
 
     generate_der_1d(d1_x, nx, dx, ider);
     generate_der_1d(d1_y, ny, dy, ider);
@@ -812,11 +759,10 @@ int main(int argc, char** argv)
 
     if (iext == 5 && irun < 2)
     {
-        external_so_m(pots.v_ext, pots.mass_eff, pots.wx, pots.wy, pots.wz, hbar2m, &lattice_coords, gr_comm, d1_x, d1_y, d1_z, nx, ny, nz);
+        external_so_m(pots.v_ext, pots.wx, pots.wy, pots.wz, gr_comm, d1_x, d1_y, d1_z, nx, ny, nz);
     }
 
-    double* occ;
-    assert(occ = malloc(2 * nxyz * sizeof(double)));
+    double* occ = Allocate<double>(2 * nxyz);
 
     if (iforce != 0 && irun < 2)
     {
@@ -894,8 +840,8 @@ int main(int argc, char** argv)
         system_energy(&cc_edf, icoul, dens, &dens_p, &dens_n, isospin, pots.delta, dens->nstart, dens->nstop, ip, gr_ip, MPI_COMM_WORLD, gr_comm, k1d_x, k1d_y, k1d_z, nx, ny, nz, hbar2m, dxyz, &lattice_coords, &fftransf_vars, nprot, nneut, file_out);
     }
 
-    double complex* delta_old;
-    assert(delta_old = (double complex*) malloc(nxyz * sizeof(double complex)));
+    complex* delta_old;
+    assert(delta_old = (complex*) malloc(nxyz * sizeof(complex)));
 
     for (int i = 0; i < nxyz; i++) 
     {
@@ -922,7 +868,7 @@ int main(int argc, char** argv)
         file_out = fopen(fn, "w");
 
         for (int i = 0;i < nxyz;i++)
-            fprintf(file_out, "delta[%d] = %.12le %12leI\n", i, creal(pots.delta[i]), cimag(pots.delta[i]));
+            fprintf(file_out, "delta[%d] = %.12le %12leI\n", i, std::real(pots.delta[i]), std::imag(pots.delta[i]));
 
         fclose(file_out);
     }
@@ -938,39 +884,43 @@ int main(int argc, char** argv)
         int liwork = 7 * na + 8 * n_iq + 2;
         int info;
 
-        assert(iwork = malloc(liwork * sizeof(int)));
+        int* iwork = Allocate<int>(liwork);
 
         // gcc
         // pzheevd_( "V" , "L" , &na , ham , &Ione , &Ione , descr_h , lam , z_eig , &Ione , &Ione , descr_h , tw , &lwork , tw_ , &lrwork , iwork , &liwork , &info ) ;
         // ibm xl
         pzheevd("V", "L", &na, ham, &Ione, &Ione, descr_h, lam, z_eig, &Ione, &Ione, descr_h, tw, &lwork, tw_, &lrwork, iwork, &liwork, &info);
         liwork = iwork[0];
-        free(iwork);
+        Free(iwork);
 
-        assert(iwork = malloc(liwork * sizeof(int)));
-        lwork = (int)creal(tw[0]);
-        assert(work = malloc(lwork * sizeof(double complex)));
-        lrwork = (int)creal(tw_[0]);
-        assert(rwork = malloc(lrwork * sizeof(double complex)));
+        int* iwork = Allocate<int>(liwork);
+
+        lwork = (int)std::real(tw[0]);
+        complex* work = Allocate<complex>(lwork);
+
+        lrwork = (int)std::real(tw_[0]);
+        double* rwork = Allocate<double>(lrwork);
         
         // gcc
         // pzheevd_( "V" , "L" , &na , ham , &Ione , &Ione , descr_h , lam , z_eig , &Ione , &Ione , descr_h , work , &lwork , rwork , &lrwork , iwork , &liwork , &info ) ;
         // ibm xl
         pzheevd("V", "L", &na, ham, &Ione, &Ione, descr_h, lam, z_eig, &Ione, &Ione, descr_h, work, &lwork, rwork, &lrwork, iwork, &liwork, &info);
-        
-        free(iwork); 
-        free(work); 
-        free(rwork);
-        
+
+        Free(iwork); 
+        Free(work); 
+        Free(rwork);
+
         for (int ii = 0; ii < m_ip * n_iq; ii++)
         {
             z_eig[ii] = sdxyz * z_eig[ii];
         }
         
-        compute_densities(lam, z_eig, nxyz, gr_ip, gr_comm, dens, m_ip, n_iq, i_p, i_q, mb, nb, p_proc, q_proc, nx, ny, nz, d1_x, d1_y, d1_z, k1d_x, k1d_y, k1d_z, e_cut, &nwf, occ, &fftransf_vars, &lattice_coords, icub);
-        
+        compute_densities(lam, z_eig, nxyz, gr_ip, gr_comm, dens, m_ip, n_iq, i_p, i_q, mb, nb, p_proc, q_proc, nx, ny, nz, d1_x, d1_y, d1_z, k1d_x, k1d_y, k1d_z, e_cut, &nwf, occ, icub);
+
         if (isymm == 1)
+        {
             axial_symmetry_densities(dens, &ax, nxyz, &lattice_coords, &fftransf_vars, gr_comm, gr_ip);
+        }
         
         for (int i = 0; i < nwf; i++)
         {
@@ -980,7 +930,7 @@ int main(int argc, char** argv)
         xpart = rescale_dens(dens, nxyz, *npart, dxyz, irsc);
         exch_nucl_dens(MPI_COMM_WORLD, ip, gr_ip, gr_np, idim, ex_array_p, ex_array_n);
         sprintf(fn, "dens%s_%1d.cwr", iso_label, it % 2);
-        
+
         if (write_dens(fn, dens, gr_comm, gr_ip, nx, ny, nz, amu, dx, dy, dz) != EXIT_SUCCESS)
         {
             fprintf(stdout, "Error, could not save densities in iteration %d of %d", it + 1, niter);
@@ -992,10 +942,12 @@ int main(int argc, char** argv)
 
         if (gr_ip == 0)
         {
-            err = 0.0;
+            err = 0;
 
-            for (int i = 0;i < nxyz;i++)
-                err += cabs(pots.delta[i] - delta_old[i]);
+            for (int i = 0; i < nxyz; i++)
+            {
+                err += std::abs(pots.delta[i] - delta_old[i]);
+            }
 
             fprintf(stdout, "err of pairing_gap%s: %.12le\n", iso_label, err);
         }
@@ -1030,7 +982,7 @@ int main(int argc, char** argv)
             sprintf(fn, "dens%s_%1d.dat", iso_label, it % 2);
 
             fd_dns = fopen(fn, "w");
-            for (int i = 0;i < nxyz;i++) 
+            for (int i = 0; i < nxyz; i++) 
             {
                 if (lattice_coords.xa[i] == 0 && lattice_coords.ya[i] == 0)
                 {
@@ -1042,7 +994,7 @@ int main(int argc, char** argv)
             sprintf(fn, "dens_%1d.dat", it % 2);
 
             fd_dns = fopen(fn, "w");
-            for (int i = 0;i < nxyz;i++) 
+            for (int i = 0; i < nxyz; i++) 
             {
                 if (lattice_coords.ya[i] == 0.)
                 {
@@ -1113,7 +1065,7 @@ int main(int argc, char** argv)
             for (int i = 2 * nxyz; i < 2 * nxyz + nwf; ++i)
             {
                 fprintf(file_out, " %12.8f    %8.6f    %10.6f\n", lam[i], occ[i - 2 * nxyz], log10(fabs(lam[i] - lam_old[i - 2 * nxyz])));
-                err += pow(lam[i] - lam_old[i - 2 * nxyz], 2.);
+                err += Square(lam[i] - lam_old[i - 2 * nxyz]);
                 lam_old[i - 2 * nxyz] = lam[i];
             }
 
@@ -1125,6 +1077,7 @@ int main(int argc, char** argv)
             
             fclose(file_out);
             sprintf(fn, "pots%s_%1d.cwr", iso_label, it % 2);
+
             i = write_pots(fn, pot_array, nx, ny, nz, dx, dy, dz, ishift);
         }
     }
@@ -1133,22 +1086,22 @@ int main(int argc, char** argv)
     {
         fftw_destroy_plan(fftransf_vars.plan_f);
         fftw_destroy_plan(fftransf_vars.plan_b);
-        free(fftransf_vars.buff);
+        Free(fftransf_vars.buff);
     }
 
-    free(ham);
-    free(lam_old);
-    free(k1d_x);
-    free(k1d_y);
-    free(k1d_z);
-    free(d1_x); 
-    free(d1_y); 
-    free(d1_z);
-    free(ex_array_n); 
-    free(ex_array_p);
+    Free(ham);
+    Free(lam_old);
+    Free(k1d_x);
+    Free(k1d_y);
+    Free(k1d_z);
+    Free(d1_x); 
+    Free(d1_y); 
+    Free(d1_z);
+    Free(ex_array_n); 
+    Free(ex_array_p);
 
     /* write the info for the TD code */
-    double* amu_n;
+    double amu_n;
     if (ip == root_n)
     {
         nwf_n = nwf;
@@ -1253,9 +1206,12 @@ int main(int argc, char** argv)
 
     }
 
-    free(z_eig);
-    free(lam); free(occ);
+    Free(z_eig);
+    Free(lam); 
+    Free(occ);
+
     destroy_mpi_groups(&group_comm, &gr_comm);
+
     MPI_Finalize();
     return EXIT_SUCCESS;
 }

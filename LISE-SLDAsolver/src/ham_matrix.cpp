@@ -9,15 +9,11 @@
 #include <assert.h>
 #include <mpi.h>
 
-#include "vars_nuclear.h"
-
-void i2xyz(int, int*, int*, int*, int, int);
-void laplacean(const double* , int, double*, int, int, MPI_Comm, const double* , const double* , const double* , int, int, int, int);
-
+#include "common.h"
 
 /* computes the occupation numbers = sum over the v's for each eigenvector */
 void occ_numbers(
-    const double complex* z, 
+    const complex* z, 
     double* occ, 
     int nxyz, 
     int m_ip, int n_iq, 
@@ -26,8 +22,7 @@ void occ_numbers(
     int p_proc, int q_proc, 
     MPI_Comm gr_comm, int gr_ip)
 {
-    double* occbuff;
-    assert(occbuff = malloc(2 * nxyz * sizeof(double)));
+    double* occbuff = Allocate<double>(2 * nxyz);
 
     memset(occbuff, 0, 2 * nxyz * sizeof(occbuff[0]));
 
@@ -44,7 +39,7 @@ void occ_numbers(
                 continue;
 
             int i = lj * m_ip + li;
-            occbuff[gj] += pow(cabs(z[i]), 2.0);
+            occbuff[gj] += Square(std::abs(z[i]));
         }
     }
 
@@ -53,7 +48,7 @@ void occ_numbers(
 }
 
 void make_ke_loc(
-    double complex* ham, 
+    complex* ham, 
     const double* k1d_x, const double* k1d_y, const double* k1d_z, 
     const double* mass_eff, 
     const double* u_loc, 
@@ -114,9 +109,9 @@ void make_ke_loc(
 }
 
 void make_pairing(
-    double complex* ham, 
+    complex* ham, 
     int nxyz, 
-    const double complex* delta, 
+    const complex* delta, 
     int m_ip, int n_iq, 
     int i_p, int i_q, 
     int mb, int nb, 
@@ -152,9 +147,9 @@ void make_pairing(
 
 /* Calculates the SO contribution between u_up and u_up and u_up and u_dn */
 void so_contributions_1(
-    double complex* ham, 
+    complex* ham, 
     double* wx, double* wy, double* wz, 
-    const double complex* d1_x, const double complex* d1_y, const double complex* d1_z, 
+    const complex* d1_x, const complex* d1_y, const complex* d1_z, 
     int nx, int ny, int nz, 
     int m_ip, int n_iq, 
     int i_p, int i_q, 
@@ -192,10 +187,10 @@ void so_contributions_1(
             if (gj / nxyz == 0)
             {
                 if (iy1 == iy2 && iz1 == iz2)
-                    ham[i] -= I * (wy[ii] + wy[jj]) * d1_x[ix1 - ix2 + nx1];
+                    ham[i] -= 1i * (wy[ii] + wy[jj]) * d1_x[ix1 - ix2 + nx1];
 
                 if (ix1 == ix2 && iz1 == iz2)
-                    ham[i] += I * (wx[ii] + wx[jj]) * d1_y[iy1 - iy2 + ny1];
+                    ham[i] += 1i * (wx[ii] + wx[jj]) * d1_y[iy1 - iy2 + ny1];
             }
             else
             {
@@ -203,26 +198,26 @@ void so_contributions_1(
                     ham[i] += (wz[ii] + wz[jj]) * d1_x[ix1 - ix2 + nx1];
 
                 if (ix1 == ix2 && iz1 == iz2)
-                    ham[i] -= I * (wz[ii] + wz[jj]) * d1_y[iy1 - iy2 + ny1];
+                    ham[i] -= 1i * (wz[ii] + wz[jj]) * d1_y[iy1 - iy2 + ny1];
 
                 if (ix1 == ix2 && iy1 == iy2)
-                    ham[i] -= (wx[ii] + wx[jj] - I * (wy[ii] + wy[jj])) * d1_z[iz1 - iz2 + nz1];
+                    ham[i] -= (wx[ii] + wx[jj] - 1i * (wy[ii] + wy[jj])) * d1_z[iz1 - iz2 + nz1];
             }
         }
     }
 }
 
 /* Calculates the SO contribution between u_dn and u_up and u_dn and u_dn */
-void so_contributions_2
-    double complex* ham, 
+void so_contributions_2(
+    complex* ham, 
     const double* wx, const double* wy, const double* wz, 
-    const double complex* d1_x, const double complex* d1_y, const double complex* d1_z, 
+    const complex* d1_x, const complex* d1_y, const complex* d1_z, 
     int nx, int ny, int nz, 
     int m_ip, int n_iq, 
     int i_p, int i_q, 
     int mb, int nb, 
     int p_proc, int q_proc
-
+)
 {
     int nx1 = nx - 1;
     int ny1 = ny - 1;
@@ -254,10 +249,10 @@ void so_contributions_2
             if (gj / nxyz == 1)
             {
                 if (iy1 == iy2 && iz1 == iz2)
-                    ham[i] += I * (wy[ii] + wy[jj]) * d1_x[ix1 - ix2 + nx1];
+                    ham[i] += 1i * (wy[ii] + wy[jj]) * d1_x[ix1 - ix2 + nx1];
 
                 if (ix1 == ix2 && iz1 == iz2)
-                    ham[i] -= I * (wx[ii] + wx[jj]) * d1_y[iy1 - iy2 + ny1];
+                    ham[i] -= 1i * (wx[ii] + wx[jj]) * d1_y[iy1 - iy2 + ny1];
             }
             else
             {
@@ -265,10 +260,10 @@ void so_contributions_2
                     ham[i] -= (wz[ii] + wz[jj]) * d1_x[ix1 - ix2 + nx1];
 
                 if (ix1 == ix2 && iz1 == iz2)
-                    ham[i] -= I * (wz[ii] + wz[jj]) * d1_y[iy1 - iy2 + ny1];
+                    ham[i] -= 1i * (wz[ii] + wz[jj]) * d1_y[iy1 - iy2 + ny1];
 
                 if (ix1 == ix2 && iy1 == iy2)
-                    ham[i] += (wx[ii] + wx[jj] + I * (wy[ii] + wy[jj])) * d1_z[iz1 - iz2 + nz1];
+                    ham[i] += (wx[ii] + wx[jj] + 1i * (wy[ii] + wy[jj])) * d1_z[iz1 - iz2 + nz1];
             }
         }
     }
@@ -276,9 +271,9 @@ void so_contributions_2
 
 /* Calculates the SO contribution between v_up and v_up and v_up and v_dn */
 void so_contributions_3(
-    double complex* ham, 
+    complex* ham, 
     const double* wx, const double* wy, const double* wz, 
-    const double complex* d1_x, const double complex* d1_y, const double complex* d1_z, 
+    const complex* d1_x, const complex* d1_y, const complex* d1_z, 
     int nx, int ny, int nz, 
     int m_ip, int n_iq, 
     int i_p, int i_q, 
@@ -316,10 +311,10 @@ void so_contributions_3(
             if (gj / nxyz == 2)
             {
                 if (iy1 == iy2 && iz1 == iz2)
-                    ham[i] -= I * (wy[ii] + wy[jj]) * d1_x[ix1 - ix2 + nx1];
+                    ham[i] -= 1i * (wy[ii] + wy[jj]) * d1_x[ix1 - ix2 + nx1];
 
                 if (ix1 == ix2 && iz1 == iz2)
-                    ham[i] += I * (wx[ii] + wx[jj]) * d1_y[iy1 - iy2 + ny1];
+                    ham[i] += 1i * (wx[ii] + wx[jj]) * d1_y[iy1 - iy2 + ny1];
             }
             else
             {
@@ -327,10 +322,10 @@ void so_contributions_3(
                     ham[i] -= (wz[ii] + wz[jj]) * d1_x[ix1 - ix2 + nx1];
 
                 if (ix1 == ix2 && iz1 == iz2)
-                    ham[i] -= I * (wz[ii] + wz[jj]) * d1_y[iy1 - iy2 + ny1];
+                    ham[i] -= 1i * (wz[ii] + wz[jj]) * d1_y[iy1 - iy2 + ny1];
 
                 if (ix1 == ix2 && iy1 == iy2)
-                    ham[i] += (wx[ii] + wx[jj] + I * (wy[ii] + wy[jj])) * d1_z[iz1 - iz2 + nz1];
+                    ham[i] += (wx[ii] + wx[jj] + 1i * (wy[ii] + wy[jj])) * d1_z[iz1 - iz2 + nz1];
             }
         }
     }
@@ -338,9 +333,9 @@ void so_contributions_3(
 
 /* Calculates the SO contribution between v_up and v_dn and v_dn and v_dn */
 void so_contributions_4(
-    double complex* ham, 
-    double* wx, double* wy, double* wz, 
-    double complex* d1_x, double complex* d1_y, double complex* d1_z, 
+    complex* ham, 
+    const double* wx, const double* wy, const double* wz, 
+    const complex* d1_x, const complex* d1_y, const complex* d1_z, 
     int nx, int ny, int nz, 
     int m_ip, int n_iq, 
     int i_p, int i_q, 
@@ -382,10 +377,10 @@ void so_contributions_4(
             if (gj / nxyz == 3)
             {
                 if (iy1 == iy2 && iz1 == iz2)
-                    ham[i] += I * (wy[ii] + wy[jj]) * d1_x[ix1 - ix2 + nx1];
+                    ham[i] += 1i * (wy[ii] + wy[jj]) * d1_x[ix1 - ix2 + nx1];
 
                 if (ix1 == ix2 && iz1 == iz2)
-                    ham[i] -= I * (wx[ii] + wx[jj]) * d1_y[iy1 - iy2 + ny1];
+                    ham[i] -= 1i * (wx[ii] + wx[jj]) * d1_y[iy1 - iy2 + ny1];
             }
             else
             {
@@ -393,10 +388,10 @@ void so_contributions_4(
                     ham[i] += (wz[ii] + wz[jj]) * d1_x[ix1 - ix2 + nx1];
 
                 if (ix1 == ix2 && iz1 == iz2)
-                    ham[i] -= I * (wz[ii] + wz[jj]) * d1_y[iy1 - iy2 + ny1];
+                    ham[i] -= 1i * (wz[ii] + wz[jj]) * d1_y[iy1 - iy2 + ny1];
 
                 if (ix1 == ix2 && iy1 == iy2)
-                    ham[i] -= (wx[ii] + wx[jj] - I * (wy[ii] + wy[jj])) * d1_z[iz1 - iz2 + nz1];
+                    ham[i] -= (wx[ii] + wx[jj] - 1i * (wy[ii] + wy[jj])) * d1_z[iz1 - iz2 + nz1];
             }
         }
     }
@@ -415,8 +410,8 @@ void i2xyz(int i, int* ix, int* iy, int* iz, int ny, int nz)
 }
 
 void make_p_term(
-    double complex* ham, 
-    double complex* d1_x, double complex* d1_y, double complex* d1_z, 
+    complex* ham, 
+    complex* d1_x, complex* d1_y, complex* d1_z, 
     double Vx, double Vy, double Vz, int nx, 
     int ny, int nz, 
     int m_ip, int n_iq, 
@@ -452,13 +447,13 @@ void make_p_term(
                 int i = lj * m_ip + li;
 
                 if (iy_i == iy_j && iz_i == iz_j)
-                    ham[i] += I * d1_x[ix_i - ix_j + nx1] * Vx;
+                    ham[i] += 1i * d1_x[ix_i - ix_j + nx1] * Vx;
 
                 if (ix_i == ix_j && iz_i == iz_j)
-                    ham[i] += I * d1_y[iy_i - iy_j + ny1] * Vy;
+                    ham[i] += 1i * d1_y[iy_i - iy_j + ny1] * Vy;
 
                 if (iy_i == iy_j && ix_i == ix_j)
-                    ham[i] += I * d1_z[iz_i - iz_j + nz1] * Vz;
+                    ham[i] += 1i * d1_z[iz_i - iz_j + nz1] * Vz;
             }
         }
     }
@@ -466,9 +461,9 @@ void make_p_term(
 
 /* constructs the full Hamiltonian matrix */
 void make_ham(
-    double complex* ham, 
+    complex* ham, 
     const double* k1d_x, const double* k1d_y, const double* k1d_z, 
-    const double complex* d1_x, const double complex* d1_y, const double complex* d1_z, 
+    const complex* d1_x, const complex* d1_y, const complex* d1_z, 
     const Potentials* pots, const Densities* dens, 
     int nx, int ny, int nz, 
     int m_ip, int n_iq, 
@@ -476,7 +471,8 @@ void make_ham(
     int mb, int nb, 
     int p_proc, int q_proc, 
     int nstart, int nstop, 
-    MPI_Comm comm)
+    MPI_Comm comm
+)
 {
 #ifdef CONSTR_Q0
     int ii0 = 0;
@@ -484,9 +480,7 @@ void make_ham(
     int ii0 = 1;
 #endif
 
-    double* u_loc;
-    assert(u_loc = malloc(pots->nxyz * sizeof(double)));
-
+    double* u_loc = Allocate<double>(pots->nxyz);
     laplacean(pots->mass_eff, pots->nxyz, u_loc, nstart, nstop, comm, k1d_x, k1d_y, k1d_z, nx, ny, nz, 1);
 
     for (int i = 0; i < pots->nxyz; i++)
@@ -501,9 +495,7 @@ void make_ham(
 
     make_ke_loc(ham, k1d_x, k1d_y, k1d_z, pots->mass_eff, u_loc, nx, ny, nz, m_ip, n_iq, i_p, i_q, mb, nb, p_proc, q_proc);
 
-    double complex* delta2;
-    assert(delta2 = malloc(pots->nxyz * sizeof(double complex)));
-    
+    complex* delta2 = Allocate<complex>(pots->nxyz);
     for (int i = 0; i < pots->nxyz; i++)
     {
         delta2[i] = pots->delta[i] + pots->delta_ext[i];

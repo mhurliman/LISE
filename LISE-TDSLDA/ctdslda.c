@@ -1204,20 +1204,20 @@ int main(int argc, char** argv)
     {
         if (latt.za[i] > 0) 
         {
-            frag.thetaR[i] = 1.;
-            frag.thetaL[i] = 0.;
+            frag.thetaR[i] = 1.0;
+            frag.thetaL[i] = 0;
         }
 
         if (latt.za[i] < 0) 
         {
-            frag.thetaR[i] = 0.;
-            frag.thetaL[i] = 1.;
+            frag.thetaR[i] = 0;
+            frag.thetaL[i] = 1.0;
         }
 
         if (latt.za[i] == 0) 
         {
-            frag.thetaR[i] = .5;
-            frag.thetaL[i] = .5;
+            frag.thetaR[i] = 0.5;
+            frag.thetaL[i] = 0.5;
         }
     }
 

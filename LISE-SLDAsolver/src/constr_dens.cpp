@@ -7,47 +7,29 @@
 #include <assert.h>
 #include <mpi.h>
 
-#include "vars_nuclear.h"
+#include "common.h"
+#include "operators.h"
 
-extern double pi;
-
-double minr(double, double);
-void grid3(const double*, const double*, const double*, int, int, int, double*, double*, double*);
-void i2xyz(int, int*, int*, int*, int,  int);
-void divide_work(const int, const int, const int, int*, int*);
-void gradient(double complex*, const int, double complex*, double complex*, double complex*, const int, const int, const MPI_Comm, double complex*, double complex*, double complex*, const int, const int, const int, const int);
-void gradient_ud(double complex* f, const int n, double complex* g_x, double complex* g_y, double complex* g_z, double complex* g_xd, double complex* g_yd, double complex* g_zd, const int nstart, const int nstop, const MPI_Comm comm, double complex* d1_x, double complex* d1_y, double complex* d1_z, const int nx, const int ny, const int nz);
-void diverg(const double*, const double*, const double*, double*, int, int, int, MPI_Comm, const double complex*, const double complex*, const double complex*, int, int, int);
-double factor_ec(const double, const double, int icub);
-void shift_coords(double complex* vec, int n, FFtransf_vars* fftransf_vars, Lattice_arrays* latt_coords, double xcm, double ycm, double zcm);
-void laplacean(const double* f, int n, double* lapf, int nstart, int nstop, MPI_Comm comm, const double* k1d_x, const double* k1d_y, const double* k1d_z, int nx, int ny, int nz, int ired);
-void laplacean_complex(const double complex* f, int n, double complex* lapf, int nstart, int nstop, MPI_Comm comm, const double* k1d_x, const double* k1d_y, const double* k1d_z, int nx, int ny, int nz, int ired);
-
-void allocate_dens(Densities* dens, int ip, int np,  int nxyz)
+void allocate_dens(Densities* dens, int ip, int np, int nxyz)
 {
     divide_work(nxyz, ip, np, &dens->nstart, &dens->nstop);
 
     int iwork = dens->nstop - dens->nstart;
     if (iwork > 0)
     {
-        assert(dens->jjx = malloc(iwork * sizeof(double)));
-        assert(dens->jjy = malloc(iwork * sizeof(double)));
-        assert(dens->jjz = malloc(iwork * sizeof(double)));
+        dens->jjx = Allocate<double>(iwork);
+        dens->jjy = Allocate<double>(iwork);
+        dens->jjz = Allocate<double>(iwork);
 
-        assert(dens->tau = malloc(iwork * sizeof(double)));
-        assert(dens->nu = malloc(iwork * sizeof(double complex)));
-        assert(dens->divjj = malloc(iwork * sizeof(double)));
-
-        memset(dens->tau, 0, iwork * sizeof(dens->tau[0]));
-        memset(dens->divjj, 0, iwork * sizeof(dens->divjj[0]));
-        memset(dens->nu, 0, iwork * sizeof(dens->nu[0]));
+        dens->tau = AllocateZeroed<double>(iwork);
+        dens->nu = AllocateZeroed<complex>(iwork);
+        dens->divjj = AllocateZeroed<double>(iwork);
     }
 
-    assert(dens->rho = malloc(nxyz * sizeof(double)));
-    memset(dens->rho, 0, nxyz * sizeof(dens->rho[0]));
+    dens->rho = AllocateZeroed<double>(nxyz);
 }
 
-void mem_share(Densities* dens, double* ex_array, const int nxyz, const int idim)
+void mem_share(Densities* dens, double* ex_array, int nxyz, int idim)
 {
     memset(ex_array, 0, idim * sizeof(ex_array[0]));
 
@@ -61,9 +43,9 @@ void mem_share(Densities* dens, double* ex_array, const int nxyz, const int idim
 }
 
 /* function to generate the 1D kinetic energy */
-void generate_ke_1d(double* ke, const int n, const double a, const int iopt_der)
+void generate_ke_1d(double* ke, int n, double a, int iopt_der)
 {
-    double pi2 = pow(pi / a, 2);
+    double pi2 = pow(PI / a, 2);
     double xn = (double)n;
     double xn2 = xn * xn;
     double constant = 2.0 * pi2 / xn2;
@@ -76,8 +58,8 @@ void generate_ke_1d(double* ke, const int n, const double a, const int iopt_der)
     double isign = -1.0;
     for (int i = 1; i < n; i++)
     {
-        double angle = (double)i * pi / xn;
-        ke[i] = isign * constant / (pow(sin(angle), 2.0));
+        double angle = (double)i * PI / xn;
+        ke[i] = isign * constant / (Square(sin(angle)));
 
         if (iopt_der == 0)
         {
@@ -89,20 +71,20 @@ void generate_ke_1d(double* ke, const int n, const double a, const int iopt_der)
 }
 
 /* Generate the 1D derivative */
-void generate_der_1d(double complex* der, const int n, const double a, const int iopt_der)
+void generate_der_1d(complex* der, int n, double a, int iopt_der)
 {
     double c1 = 0;  /* remove the highest component for c1=0 */
 
     double xn = (double)n;
     int n1 = n - 1;
-    double c = pi / xn;
+    double c = PI / xn;
 
     /* Note: the order in the derivative array is: -( N - 1 ) cooresponding to der[0],
        -(N-1) + 1 corresponds to der[1] , and so forth */
     if (iopt_der == 0)
         der[n1] = 0;
     else
-        der[n1] = -c * c1 * I / a;
+        der[n1] = -c * c1 * 1i / a;
 
     double isign = -1.0 / a;
 
@@ -113,101 +95,112 @@ void generate_der_1d(double complex* der, const int n, const double a, const int
         if (iopt_der == 0)
             der[n1 + i] = isign * c / sin(angle);
         else
-            der[n1 + i] = isign * c * (1.0 / tan(angle) - c1 * I);
+            der[n1 + i] = isign * c * (1.0 / tan(angle) - c1 * 1i);
 
         isign = -isign;
         der[n1 - i] = -conj(der[n1 + i]);
     }
 }
 
-void make_coordinates(const int nxyz, const int nx, const int ny, const int nz, const double dx, const double dy, const double dz, Lattice_arrays* lattice_vars)
+void make_coordinates(int nxyz, int nx, int ny, int nz, double dx, double dy, double dz, Lattice_arrays* lattice_vars)
 {
-    assert(lattice_vars->wx = malloc(nxyz * sizeof(int)));
-    assert(lattice_vars->wy = malloc(nxyz * sizeof(int)));
-    assert(lattice_vars->wz = malloc(nxyz * sizeof(int)));
-    assert(lattice_vars->xa = malloc(nxyz * sizeof(double)));
-    assert(lattice_vars->ya = malloc(nxyz * sizeof(double)));
-    assert(lattice_vars->za = malloc(nxyz * sizeof(double)));
-    assert(lattice_vars->kx = malloc(nxyz * sizeof(double)));
-    assert(lattice_vars->ky = malloc(nxyz * sizeof(double)));
-    assert(lattice_vars->kz = malloc(nxyz * sizeof(double)));
-    assert(lattice_vars->kin = malloc(nxyz * sizeof(double)));
+    lattice_vars->wx = Allocate<int>(nxyz);
+    lattice_vars->wy = Allocate<int>(nxyz);
+    lattice_vars->wz = Allocate<int>(nxyz);
 
-    double* xx, *yy, *zz;
-    assert(xx = malloc(nx * sizeof(double)));
-    assert(yy = malloc(ny * sizeof(double)));
-    assert(zz = malloc(nz * sizeof(double)));
+    lattice_vars->xa = Allocate<double>(nxyz);
+    lattice_vars->ya = Allocate<double>(nxyz);
+    lattice_vars->za = Allocate<double>(nxyz);
+    lattice_vars->kx = Allocate<double>(nxyz);
+    lattice_vars->ky = Allocate<double>(nxyz);
+    lattice_vars->kz = Allocate<double>(nxyz);
+    lattice_vars->kin = Allocate<double>(nxyz);
 
-    for (int i = 0; i < nx; i++)
-        xx[i] = 1.0;
+    double* xx = AllocateFilled<double>(nx, 1.0);
+    double* yy = AllocateFilled<double>(ny, 1.0);
+    double* zz = AllocateFilled<double>(nz, 1.0);
+
     xx[nx / 2] = 0;
-
-    for (int i = 0; i < ny; i++)
-        yy[i] = 1.0;
     yy[ny / 2] = 0;
-
-    for (int i = 0; i < nz; i++)
-        zz[i] = 1.0;
     zz[nz / 2] = 0;
 
     grid3(xx, yy, zz, nx, ny, nz, lattice_vars->xa, lattice_vars->ya, lattice_vars->za);
 
     for (int i = 0; i < nxyz; i++) 
     {
-        lattice_vars->wx[i] = (int)lattice_vars->xa[i];
-        lattice_vars->wy[i] = (int)lattice_vars->ya[i];
-        lattice_vars->wz[i] = (int)lattice_vars->za[i];
+        lattice_vars->wx[i] = static_cast<double>(lattice_vars->xa[i]);
+        lattice_vars->wy[i] = static_cast<double>(lattice_vars->ya[i]);
+        lattice_vars->wz[i] = static_cast<double>(lattice_vars->za[i]);
     }
 
-    double xn = ((double)nx) / 2.0;
+    double xn = static_cast<double>(nx) / 2.0;
     for (int i = 0; i < nx; i++)
-        xx[i] = ((double)i - xn) * dx;
+        xx[i] = (static_cast<double>(i) - xn) * dx;
 
     xn = ((double)ny) / 2.0;
     for (int i = 0; i < ny; i++)
-        yy[i] = ((double)i - xn) * dy;
+        yy[i] = (static_cast<double>(i) - xn) * dy;
 
     xn = ((double)nz) / 2.0;
     for (int i = 0; i < nz; i++)
-        zz[i] = ((double)i - xn) * dz;
+        zz[i] = (static_cast<double>(i) - xn) * dz;
 
     grid3(xx, yy, zz, nx, ny, nz, lattice_vars->xa, lattice_vars->ya, lattice_vars->za);
 
     /* set also the momentum space */
-    xn = pi / ((double)nx * dx);
+    xn = PI / (static_cast<double>(nx) * dx);
     for (int i = 0; i < nx / 2; i++)
     {
         xx[i] = (double)(2 * i) * xn;
         xx[i + nx / 2] = (double)(2 * i - nx) * xn;
     }
 
-    xn = pi / ((double)ny * dy);
+    xn = PI / (static_cast<double>(ny) * dy);
     for (int i = 0; i < ny / 2; i++)
     {
-        yy[i] = (double)(2 * i) * xn;
-        yy[i + ny / 2] = (double)(2 * i - ny) * xn;
+        yy[i] = static_cast<double>(2 * i) * xn;
+        yy[i + ny / 2] = static_cast<double>(2 * i - ny) * xn;
     }
 
-    xn = pi / ((double)nz * dz);
+    xn = PI / static_cast<double>(nz * dz);
     for (int i = 0; i < nz / 2; i++)
     {
-        zz[i] = (double)(2 * i) * xn;
-        zz[i + nz / 2] = (double)(2 * i - nz) * xn;
+        zz[i] = static_cast<double>(2 * i) * xn;
+        zz[i + nz / 2] = static_cast<double>(2 * i - nz) * xn;
     }
 
     grid3(xx, yy, zz, nx, ny, nz, lattice_vars->kx, lattice_vars->ky, lattice_vars->kz);
-    
+
     for (int i = 0; i < nxyz; i++)
     {
-        lattice_vars->kin[i] = pow(lattice_vars->kx[i], 2.0) + pow(lattice_vars->ky[i], 2.0) + pow(lattice_vars->kz[i], 2.0);
+        lattice_vars->kin[i] = Square(lattice_vars->kx[i]) + Square(lattice_vars->ky[i]) + Square(lattice_vars->kz[i]);
     }
 
-    free(xx);
-    free(yy);
-    free(zz);
+    Free(xx);
+    Free(yy);
+    Free(zz);
 }
 
-void compute_densities(double* lam, double complex* z, const int nxyz, const int ip, const MPI_Comm comm, Densities* dens, const int m_ip, const int n_iq, const int i_p, const int i_q, const int mb, const int nb, const int p_proc, const int q_proc, const int nx, const int ny, const int nz, double complex* d1_x, double complex* d1_y, double complex* d1_z, double* k1d_x, double* k1d_y, double* k1d_z, const double e_max, int* nwf, double* occ, FFtransf_vars* fftransf_vars, Lattice_arrays* latt_coords, int icub)
+void compute_densities(
+    const double* lam, 
+    const complex* z, 
+    int nxyz, 
+    int ip, 
+    MPI_Comm comm, 
+    Densities* dens, 
+    int m_ip, int n_iq, 
+    int i_p, int i_q, 
+    int mb, int nb, 
+    int p_proc, int q_proc, 
+    int nx, int ny, 
+    int nz, 
+    const complex* d1_x, const complex* d1_y, const complex* d1_z, 
+    const double* k1d_x, const double* k1d_y, const double* k1d_z, 
+    double e_max, 
+    int* nwf, 
+    double* occ, 
+    int icub
+)
 {
     /*
      * Computes the particle, anomalous and current densities from the eigenvectors z
@@ -220,35 +213,31 @@ void compute_densities(double* lam, double complex* z, const int nxyz, const int
     int nn = 3 * nxyz;
     int nhalf = 2 * nxyz;
 
-    double complex* lapl_d, *lapl_u; // laplacian of up and down components 
-    assert(lapl_u = malloc(nxyz * sizeof(double complex))); // Asserting the laplacean elements.
-    assert(lapl_d = malloc(nxyz * sizeof(double complex)));
+    // laplacian of up and down components 
+    complex* lapl_u = Allocate<complex>(nxyz); // Asserting the laplacean elements.
+    complex* lapl_d = Allocate<complex>(nxyz);
 
-    double complex* dx_d, *dy_d, *dz_d, *dx_u, *dy_u, *dz_u;
+    complex* dx_d, *dy_d, *dz_d, *dx_u, *dy_u, *dz_u;
     if (iwork > 0) 
     {
-        assert(dx_d = malloc(iwork * sizeof(double complex)));
-        assert(dy_d = malloc(iwork * sizeof(double complex)));
-        assert(dz_d = malloc(iwork * sizeof(double complex)));
-        assert(dx_u = malloc(iwork * sizeof(double complex)));
-        assert(dy_u = malloc(iwork * sizeof(double complex)));
-        assert(dz_u = malloc(iwork * sizeof(double complex)));
+        dx_d = Allocate<complex>(iwork);
+        dy_d = Allocate<complex>(iwork);
+        dz_d = Allocate<complex>(iwork);
+
+        dx_u = Allocate<complex>(iwork);
+        dy_u = Allocate<complex>(iwork);
+        dz_u = Allocate<complex>(iwork);
     }
 
-    double* rho, *occ1;
-    assert(occ1 = malloc(nhalf * sizeof(double)));
-    assert(rho = malloc(nxyz * sizeof(double)));
+    double* occ1 = AllocateZeroed<double>(nhalf);
+    double* rho = AllocateZeroed<double>(nxyz);
 
-    memset(rho, 0, nxyz * sizeof(rho[0]));
-    memset(occ1, 0, nhalf * sizeof(occ1[0]));
+    complex* vec = Allocate<complex>(nn);
+    complex* vec1 = Allocate<complex>(n);
 
-    double complex* vec, *vec1;
-    assert(vec = malloc(nn * sizeof(double complex)));
-    assert(vec1 = malloc(n * sizeof(double complex)));
-
-    memset(dens->tau, 0, iwork * sizeof(dens->tau[0]));
-    memset(dens->divjj, 0, iwork * sizeof(dens->divjj[0]));
-    memset(dens->nu, 0, iwork * sizeof(dens->nu[0]));
+    ZeroMemory(dens->tau, iwork);
+    ZeroMemory(dens->divjj, iwork);
+    ZeroMemory(dens->nu, iwork);
 
     *nwf = 0;
 
@@ -257,11 +246,11 @@ void compute_densities(double* lam, double complex* z, const int nxyz, const int
     {
         /* construct one vector at a time for positive eigenvalues */
         f1 = sqrt(factor_ec(lam[jj], e_max, icub));
-        if (f1 < 1.e-6)
+
+        if (f1 < 1e-6)
             break;
 
-        for (int i = 0; i < n; i++)
-            vec1[i] = 0;
+        memset(vec1, 0, n * sizeof(vec1[0]));
 
 #pragma omp parallel for default(shared) private(li,ii,lj,j) 
         for (int lj = 0; lj < n_iq; lj++)
@@ -272,7 +261,7 @@ void compute_densities(double* lam, double complex* z, const int nxyz, const int
             {
                 for (int li = 0; li < m_ip; li++)
                 {
-                    ii = i_p * mb + (li / mb) * p_proc * mb + li % mb;
+                    int ii = i_p * mb + (li / mb) * p_proc * mb + li % mb;
                     vec1[ii] = z[lj * m_ip + li] * f1;
                 }
             }
@@ -292,12 +281,12 @@ void compute_densities(double* lam, double complex* z, const int nxyz, const int
             int iu = i + nxyz;
             int id = iu + nxyz;
 
-            occ1[*nwf] += (pow(cabs(vec[iu]), 2.) + pow(cabs(vec[id]), 2.));
-            rho[i] += (pow(cabs(vec[iu]), 2.) + pow(cabs(vec[id]), 2.));
+            occ1[*nwf] += (Square(std::abs(vec[iu])) + Square(std::abs(vec[id])));
+            rho[i] += (Square(std::abs(vec[iu])) + Square(std::abs(vec[id])));
 
-            dens->tau[ii] -= creal(conj(vec[iu]) * lapl_u[i] + conj(vec[id]) * lapl_d[i]);
+            dens->tau[ii] -= std::real(conj(vec[iu]) * lapl_u[i] + conj(vec[id]) * lapl_d[i]);
             dens->nu[ii] -= (conj(vec[i]) * vec[iu]);
-            dens->divjj[ii] -= (cimag(dy_u[ii] * conj(dx_u[ii]) - dy_d[ii] * conj(dx_d[ii]) + dz_u[ii] * conj(dy_d[ii]) - dy_u[ii] * conj(dz_d[ii])) + creal(dx_d[ii] * conj(dz_u[ii]) - dx_u[ii] * conj(dz_d[ii])));
+            dens->divjj[ii] -= (std::imag(dy_u[ii] * conj(dx_u[ii]) - dy_d[ii] * conj(dx_d[ii]) + dz_u[ii] * conj(dy_d[ii]) - dy_u[ii] * conj(dz_d[ii])) + std::real(dx_d[ii] * conj(dz_u[ii]) - dx_u[ii] * conj(dz_d[ii])));
         }
 
         (*nwf)++;
@@ -334,7 +323,25 @@ void compute_densities(double* lam, double complex* z, const int nxyz, const int
     free(rho);
 }
 
-void compute_densities_finitetemp(double* lam, double complex* z, const int nxyz, const int ip, const MPI_Comm comm, Densities* dens, const int m_ip, const int n_iq, const int i_p, const int i_q, const int mb, const int nb, const int p_proc, const int q_proc, const int nx, const int ny, const int nz, double complex* d1_x, double complex* d1_y, double complex* d1_z, const double e_max, const double temp, int* nwf, double* occ, FFtransf_vars* fftransf_vars, Lattice_arrays* latt_coords, int icub)
+void compute_densities_finitetemp(
+    const double* lam, 
+    const complex* z, 
+    int nxyz, 
+    int ip, 
+    MPI_Comm comm, 
+    Densities* dens, 
+    int m_ip, int n_iq, 
+    int i_p, int i_q, 
+    int mb, int nb, 
+    int p_proc, int q_proc, 
+    int nx, int ny, int nz, 
+    const complex* d1_x, const complex* d1_y, const complex* d1_z, 
+    double e_max, 
+    double temp, 
+    int* nwf, 
+    double* occ,
+    int icub
+)
 {
     /*
      * Computes the particle, anomalous and current densities from the eigenvectors z in finite temperature case
@@ -346,31 +353,28 @@ void compute_densities_finitetemp(double* lam, double complex* z, const int nxyz
     int nn = 3 * nxyz;
     int nhalf = 2 * nxyz;
 
-    double complex* dx_d, * dy_d, * dz_d, * dx_u, * dy_u, * dz_u;
+    complex* dx_d, *dy_d, *dz_d, *dx_u, *dy_u, *dz_u;
     if (iwork > 0) 
     {
-        assert(dx_d = malloc(iwork * sizeof(double complex)));
-        assert(dy_d = malloc(iwork * sizeof(double complex)));
-        assert(dz_d = malloc(iwork * sizeof(double complex)));
-        assert(dx_u = malloc(iwork * sizeof(double complex)));
-        assert(dy_u = malloc(iwork * sizeof(double complex)));
-        assert(dz_u = malloc(iwork * sizeof(double complex)));
+        dx_d = Allocate<complex>(iwork);
+        dy_d = Allocate<complex>(iwork);
+        dz_d = Allocate<complex>(iwork);
+
+        dx_u = Allocate<complex>(iwork);
+        dy_u = Allocate<complex>(iwork);
+        dz_u = Allocate<complex>(iwork);
     }
+    
 
-    double* rho, * occ1;
-    assert(occ1 = malloc(nhalf * sizeof(double)));
-    assert(rho = malloc(nxyz * sizeof(double)));
+    double* occ1 = AllocateZeroed<double>(nhalf);
+    double* rho = AllocateZeroed<double>(nxyz);
 
-    memset(rho, 0, nxyz * sizeof(rho[0]));
-    memset(occ1, 0, nhalf * sizeof(occ1[0]));
+    complex* vec = Allocate<complex>(nn);
+    complex* vec1 = Allocate<complex>(n);
 
-    double complex* vec, *vec1;
-    assert(vec = malloc(nn * sizeof(double complex)));
-    assert(vec1 = malloc(n * sizeof(double complex)));
-
-    memset(dens->tau, 0, iwork * sizeof(dens->tau[0]));
-    memset(dens->divjj, 0, iwork * sizeof(dens->divjj[0]));
-    memset(dens->nu, 0, iwork * sizeof(dens->nu[0]));
+    ZeroMemory(dens->tau, iwork);
+    ZeroMemory(dens->divjj, iwork);
+    ZeroMemory(dens->nu, iwork);
 
     *nwf = 0;
 
@@ -394,9 +398,9 @@ void compute_densities_finitetemp(double* lam, double complex* z, const int nxyz
             int j = i_q * nb + (lj / nb) * q_proc * nb + lj % nb;
 
             if (j == jj)
-                for (li = 0; li < m_ip; li++)
+                for (int li = 0; li < m_ip; li++)
                 {
-                    ii = i_p * mb + (li / mb) * p_proc * mb + li % mb;
+                    int ii = i_p * mb + (li / mb) * p_proc * mb + li % mb;
                     vec1[ii] = z[lj * m_ip + li] * f1;
                 }
         }
@@ -412,12 +416,12 @@ void compute_densities_finitetemp(double* lam, double complex* z, const int nxyz
             int iu = i + nxyz;  // v - up component
             int id = iu + nxyz;   // v - down component 
 
-            occ1[*nwf] += (pow(cabs(vec[iu]), 2.) + pow(cabs(vec[id]), 2.)) * ft;
-            rho[i] += (pow(cabs(vec[iu]), 2.) + pow(cabs(vec[id]), 2.)) * ft;
+            occ1[*nwf] += (Square(std::abs(vec[iu])) + Square(std::abs(vec[id]))) * ft;
+            rho[i] += (Square(std::abs(vec[iu])) + Square(std::abs(vec[id]))) * ft;
 
-            dens->tau[ii] += (pow(cabs(dx_d[ii]), 2.) + pow(cabs(dy_d[ii]), 2.) + pow(cabs(dz_d[ii]), 2.) + pow(cabs(dx_u[ii]), 2.) + pow(cabs(dy_u[ii]), 2.) + pow(cabs(dz_u[ii]), 2.)) * ft;
+            dens->tau[ii] += (Square(std::abs(dx_d[ii])) + Square(std::abs(dy_d[ii])) + Square(std::abs(dz_d[ii])) + Square(std::abs(dx_u[ii])) + Square(std::abs(dy_u[ii])) + Square(std::abs(dz_u[ii]))) * ft;
             dens->nu[ii] -= (conj(vec[i]) * vec[iu]) * (2 * ft - 1);
-            dens->divjj[ii] -= (cimag(dy_u[ii] * conj(dx_u[ii]) - dy_d[ii] * conj(dx_d[ii]) + dz_u[ii] * conj(dy_d[ii]) - dy_u[ii] * conj(dz_d[ii])) + creal(dx_d[ii] * conj(dz_u[ii]) - dx_u[ii] * conj(dz_d[ii]))) * ft;
+            dens->divjj[ii] -= (std::imag(dy_u[ii] * conj(dx_u[ii]) - dy_d[ii] * conj(dx_d[ii]) + dz_u[ii] * conj(dy_d[ii]) - dy_u[ii] * conj(dz_d[ii])) + std::real(dx_d[ii] * conj(dz_u[ii]) - dx_u[ii] * conj(dz_d[ii]))) * ft;
         }
 
         // finite temperature part. II
@@ -427,14 +431,14 @@ void compute_densities_finitetemp(double* lam, double complex* z, const int nxyz
 #pragma omp parallel for default(shared) private(i,iu,id,ii) 
         for (int i = nstart; i < nstop; i++)
         {
-            ii = i - nstart;
-            iu = i;  // u - up component
-            id = iu + nxyz;   // u - down component 
-            occ1[*nwf] += (pow(cabs(vec[iu]), 2.) + pow(cabs(vec[id]), 2.)) * (1 - ft);
-            rho[i] += (pow(cabs(vec[iu]), 2.) + pow(cabs(vec[id]), 2.)) * (1 - ft);
+            int ii = i - nstart;
+            int iu = i;  // u - up component
+            int id = iu + nxyz;   // u - down component 
+            occ1[*nwf] += (Square(std::abs(vec[iu])) + Square(std::abs(vec[id]))) * (1 - ft);
+            rho[i] += (Square(std::abs(vec[iu])) + Square(std::abs(vec[id]))) * (1 - ft);
 
-            dens->tau[ii] += (pow(cabs(dx_d[ii]), 2.) + pow(cabs(dy_d[ii]), 2.) + pow(cabs(dz_d[ii]), 2.) + pow(cabs(dx_u[ii]), 2.) + pow(cabs(dy_u[ii]), 2.) + pow(cabs(dz_u[ii]), 2.)) * (1 - ft);
-            dens->divjj[ii] -= (cimag(dy_u[ii] * conj(dx_u[ii]) - dy_d[ii] * conj(dx_d[ii]) + dz_u[ii] * conj(dy_d[ii]) - dy_u[ii] * conj(dz_d[ii])) + creal(dx_d[ii] * conj(dz_u[ii]) - dx_u[ii] * conj(dz_d[ii]))) * (1 - ft);
+            dens->tau[ii] += (Square(std::abs(dx_d[ii])) + Square(std::abs(dy_d[ii])) + Square(std::abs(dz_d[ii])) + Square(std::abs(dx_u[ii])) + Square(std::abs(dy_u[ii])) + Square(std::abs(dz_u[ii]))) * (1 - ft);
+            dens->divjj[ii] -= (std::imag(dy_u[ii] * conj(dx_u[ii]) - dy_d[ii] * conj(dx_d[ii]) + dz_u[ii] * conj(dy_d[ii]) - dy_u[ii] * conj(dz_d[ii])) + std::real(dx_d[ii] * conj(dz_u[ii]) - dx_u[ii] * conj(dz_d[ii]))) * (1 - ft);
         }
 
         (*nwf)++;
@@ -465,7 +469,7 @@ void compute_densities_finitetemp(double* lam, double complex* z, const int nxyz
     }
 }
 
-double factor_ec(const double e, const double e_cut, int icub)
+double factor_ec(double e, double e_cut, int icub)
 {
     double e1 = (e - e_cut) / 0.25;
 
@@ -497,7 +501,13 @@ double factor_ec(const double e, const double e_cut, int icub)
     return fact;
 }
 
-void shift_coords(double complex* vec, const int n, FFtransf_vars* fftransf_vars, Lattice_arrays* latt_coords, const double xcm, const double ycm, const double zcm)
+void shift_coords(
+    complex* vec, 
+    int n, 
+    FFtransf_vars* fftransf_vars, 
+    const Lattice_arrays* latt_coords, 
+    double xcm, double ycm, double zcm
+)
 {
     for (int i = 0; i < n; i++)
     {
@@ -508,7 +518,7 @@ void shift_coords(double complex* vec, const int n, FFtransf_vars* fftransf_vars
     for (int i = 0; i < n; i++)
     {
         double xarg = latt_coords->kx[i] * xcm + latt_coords->ky[i] * ycm + latt_coords->kz[i] * zcm;
-        fftransf_vars->buff[i] *= (cos(xarg) + I * sin(xarg));
+        fftransf_vars->buff[i] *= (cos(xarg) + 1i * sin(xarg));
     }
 
     fftw_execute(fftransf_vars->plan_b);
@@ -520,7 +530,7 @@ void shift_coords(double complex* vec, const int n, FFtransf_vars* fftransf_vars
     }
 }
 
-double rescale_dens(Densities* dens, const int nxyz, const double npart, const double dxyz, const int iscale)
+double rescale_dens(Densities* dens, int nxyz, double npart, double dxyz, int iscale)
 {
     double xpart = 0;
     for (int i = 0; i < nxyz; i++)
@@ -543,9 +553,15 @@ double rescale_dens(Densities* dens, const int nxyz, const double npart, const d
     return xpart;
 }
 
-void exch_nucl_dens(const MPI_Comm commw, const int ip, const int gr_ip, const int gr_np, const int idim, double* ex_array_p, double* ex_array_n)
+void exch_nucl_dens(
+    MPI_Comm commw, 
+    int ip, 
+    int gr_ip, int gr_np, 
+    int idim, 
+    double* ex_array_p, double* ex_array_n
+)
 {
-    int tag1 = 100, tag2 = 300;
+    const int tag1 = 100, tag2 = 300;
 
     MPI_Status istats;
     if (ip == gr_ip)
@@ -569,7 +585,11 @@ void exch_nucl_dens(const MPI_Comm commw, const int ip, const int gr_ip, const i
     }
 }
 
-void grid3(const double* xx, const double* yy, const double* zz, int nx, int ny, int nz, double* X, double* Y, double* Z)
+void grid3(
+    const double* xx, const double* yy, const double* zz, 
+    int nx, int ny, int nz, 
+    double* X, double* Y, double* Z
+)
 {
     for (int ix = 0; ix < nx; ix++)
     {
@@ -587,10 +607,10 @@ void grid3(const double* xx, const double* yy, const double* zz, int nx, int ny,
     }
 }
 
-void divide_work(const int n, const int ip, const int np, int* nstart, int* nstop)
+void divide_work(int n, int ip, int np, int* nstart, int* nstop)
 {
-    int nav = n / np;
-    int nspill = n - np * nav;
+    const int nav = n / np;
+    const int nspill = n - np * nav;
 
     *nstop = 0;
 
@@ -598,14 +618,15 @@ void divide_work(const int n, const int ip, const int np, int* nstart, int* nsto
     {
         *nstart = *nstop;
         *nstop = *nstart + nav;
+
         if (i < nspill)
         {
-            *nstop = *nstop + 1;
+            (*nstop)++;
         }
     }
 }
 
-void array_rescale(double* a, const int n, const double alpha)
+void array_rescale(double* a, int n, double alpha)
 {
     for (int i = 0; i < n; i++)
     {
@@ -614,17 +635,17 @@ void array_rescale(double* a, const int n, const double alpha)
 }
 
 void cm_initial(
-    double* lam, 
-    std::complex<double>* z, 
-    const int m_ip, const int n_iq, 
-    const int i_p, const int i_q, 
-    const int mb, const int nb, 
-    const int p_proc, const int q_proc, 
-    const int nx, const int ny, const int nz, 
-    const double e_max, 
-    Lattice_arrays* latt_coords, 
+    const double* lam, 
+    const complex* z, 
+    int m_ip, int n_iq, 
+    int i_p, int i_q, 
+    int mb, int nb, 
+    int p_proc, int q_proc, 
+    int nx, int ny, int nz, 
+    double e_max, 
+    const Lattice_arrays* latt_coords, 
     double* xcm, double* ycm, double* zcm, 
-    const MPI_Comm comm, 
+    MPI_Comm comm, 
     int icub
 )
 {
@@ -653,9 +674,9 @@ void cm_initial(
 
             if (j == jj)
             {
-                for (li = 0; li < m_ip; li++)
+                for (int li = 0; li < m_ip; li++)
                 {
-                    double wf = pow(cabs(z[lj * m_ip + li]) * f1, 2.);
+                    double wf = pow(std::abs(z[lj * m_ip + li]) * f1, 2.);
                     int i = (i_p * mb + (li / mb) * p_proc * mb + li % mb);
 
                     if (i > nhalf - 1)
@@ -687,9 +708,8 @@ void cm_initial(
 
 void change_mu_eq_sp(double* amu, double* lam, double* occ, const int nwf, const double npart)
 {
-    double* e_eq, *del2;
-    assert(e_eq = malloc(nwf * sizeof(double)));
-    assert(del2 = malloc(nwf * sizeof(double)));
+    double* e_eq = Allocate<double>(nwf);
+    double* del2 = Allocate<double>(nwf);
 
     for (int i = 0; i < nwf; ++i)
     {
@@ -717,7 +737,7 @@ void change_mu_eq_sp(double* amu, double* lam, double* occ, const int nwf, const
         }
 
         dndmu = 1.0 / dndmu;
-        dndmu = minr(0.8 * dndmu, 3.0);
+        dndmu = std::min(0.8 * dndmu, 3.0);
 
         *amu += dndmu * (npart - xpart);
     }
@@ -726,12 +746,14 @@ void change_mu_eq_sp(double* amu, double* lam, double* occ, const int nwf, const
     free(e_eq);
 }
 
-double minr(double x, double y)
-{
-    return x < y ? x : y;
-}
-
-double distMass(double* rho_p, double* rho_n, double n, double z0, double* za, int* wz, double dxyz)
+double distMass(
+    const double* rho_p, const double* rho_n, 
+    double n, 
+    double z0, 
+    const double* za, 
+    const int* wz, 
+    double dxyz
+)
 {
     double sum1 = 0;
     double sum2 = 0;
